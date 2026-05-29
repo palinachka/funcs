@@ -1,0 +1,1606 @@
+\documentclass[11pt,leqno]{book}
+\usepackage{graphicx} 
+\graphicspath{{pics/}}
+\usepackage[T2A]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[english]{babel}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{amsthm}
+\raggedbottom
+\usepackage{newpxtext}
+\usepackage{newpxmath}
+\usepackage{subcaption}
+\usepackage[capitalise]{cleveref}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{chngcntr}
+\makeatletter
+\let\c@table\c@figure % for (1)
+\let\ftype@table\ftype@figure % for (2)
+\makeatother
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{subcaption}
+\captionsetup[subfigure]{font=scriptsize}
+\usepackage[margin=1.15in]{geometry}
+\allowdisplaybreaks
+\usepackage{physics}
+\usepackage{float}
+\usepackage{setspace}
+
+\theoremstyle{definition}
+\usepackage{nicefrac}
+\usepackage[official]{eurosym}
+\usepackage{graphicx}
+%\usepackage{makeidx}
+\usepackage{nomencl}
+
+\usepackage{tabto}
+
+\usepackage{fancyhdr}
+\usepackage{amscd}
+\usepackage[english]{babel}
+
+\usepackage[margin=1.15in]{geometry}
+
+
+\theoremstyle{plain}
+%\theoremstyle{definition}
+
+\newtheorem*{theorem*}{Theorem}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{lemma}[theorem]{Lemma}
+
+%\renewcommand*{\thetheorem}{\Alph{theorem}}
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{\scshape{Definition}}
+\newtheorem{conjecture}[theorem]{\scshape{Convention}}
+\newtheorem{example}[theorem]{\scshape{Example}}
+\newtheorem{claim}[theorem]{\scshape{Claim}}
+\newtheorem{remark}[theorem]{\scshape{Remark}}
+\newtheorem{problem}[theorem]{\scshape{Problem}}
+
+\onehalfspacing  
+\title{Bachelor project VT26}
+\author{Palina Ramanovich}
+\date{February 2026}
+
+\begin{document}
+\begin{titlepage}
+   \begin{center}
+       \vspace*{1cm}
+
+       \textbf{\Large{Optimal Smoothing of Noisy Industrial Data Using Smoothing Splines and Generalized Cross-Validation}}
+
+       \vspace{0.5cm}
+      %  Thesis Subtitle
+            
+       \vspace{1.5cm}
+
+       \textbf{\large{Palina Ramanovich}}
+
+       \vfill
+            
+       \large{Thesis supervisors: Mengwu Guo, Viktor Linders}
+            
+       \vspace{0.8cm}
+     
+       
+            
+      % Department Name\\
+      % University Name\\
+      % Country\\
+       Date: \today
+   \end{center}
+\end{titlepage}
+\let\cleardoublepage\clearpage
+
+\vspace*{4cm}
+\begin{center}
+\section*{Abstract}
+\end{center}
+{The extent of data usage today made the problem of its smoothing and filtering more relevant than ever. In this thesis we explore one of the possible approaches to this problem: smoothing splines. When trying to clean noisy data, we want the final result to be both smooth and close to the original data set, thus it is logical to simultaneously minimize both of these values, while controlling the significance of each with some trade-off parameter $\lambda.$ It is shown how splines of varying degrees naturally occur in the defined minimization problem, and how to construct linear and cubic ones given $\lambda.$ The ways of computing the optimal trade-off parameter are also presented, with the focus of the thesis being Generalized Cross-Validation (GCV) method. We formulate an algorithm to construct the GCV function and compute the optimal $\lambda$ from it. The smoothing splines for several synthetic signals obtained from this algorithm are analyzed using various statistical metrics, and the gathered information is then used to better understand the results of the method applied to real-life data sets provided by a company.
+
+\vspace*{\fill}
+\clearpage
+\newpage
+\vspace*{4cm}
+\begin{center}
+\section*{Popular scientific summary}
+
+--
+\end{center}
+\newpage
+\begin{center}
+\section*{Acknowledgements}
+--
+\end{center}
+
+
+
+\tableofcontents
+
+
+\newpage
+\chapter{Introduction}
+\section{The Problem of Noisy Data}
+There is, in all likelihood, no organization left in the world that has not dealt with data in some shape or form -- it is essential for informed decision-making, optimizing workflows, product development, etc. Most of the data companies are utilizing is empirical, and most of the empirical data contains some sort of noise -- be it a slight miscalibration of the measuring instruments, environmental factors, or simply human error -- we can rarely rely on it to be an exact representation of the true pattern. Direct interpolation of such noisy data is therefore an ill-advised strategy -- it requires some sort of smoothing that preserves the true underlying structure. Conveniently, this concept has been developing for quite some time -- the history of data smoothing is long and substantial. It predates the invention of computers, with the first mentions appearing as early as the 18\textsuperscript{th} century \cite{smoothistory} -- of course, in a widely different format from the ones we have now: at the time mathematicians used basic techniques like visual interpolation and averaging to account for possible errors in the data, volume of which was also considerably smaller than that available today. In the 20\textsuperscript{th} century more recognizable methods such as moving averages and global polynomial regression appeared, and while they were certainly superior to the approaches mentioned before, they were associated with a number of problems. In particular, polynomial regression required the usage of high-degree polynomials to fit complicated functions, which were notoriously unstable and often caused \textit{Runge's phenomenon} -- massive oscillations at the edges of the data range. Thus, something different had to be developed that would avoid the need for high-degree polynomials.
+\section{Smoothing Splines}
+The concept, as well as the term \textit{spline}, was first introduced by I. J. Schoenberg in 1946 in \cite{Schoenberg1946}, the name stemming from the eponymous mechanical device once used for drawing smooth curves. Its working principle, putting heavy objects on a thin flexible bar made of some elastic material to take the desired shape, implies the definition of a spline -- a function constructed piecewise by polynomials. The advantages of splines are numerous -- they are accurate, stable, computationally efficient, and crucially, do not require high-degree polynomials to be reliable even for large amounts of data. They continue to be widely used for various reasons, one of them being data smoothing.
+The concept of smoothing data using spline functions as it is known today is commonly credited to Schoenberg \cite{schoen1964} in 1964. However, the basis behind it was introduced by E. T. Whittaker, who, in his 1923 paper \cite{Whittaker_1922}, proposed a method of smoothing data by replacing the original ordinates $y_i$ with adjusted values $y^{*}_i$ obtained by minimizing the weighted sum of "roughness" and inaccuracy:
+\begin{equation}
+\lambda \sum_{i=1}^{n-m} \left( \Delta^m y_i^{*} \right)^2
+\;+\;
+\sum_{i=1}^{n} \left( y_i^{*} - y_i \right)^2,
+\label{eq:whittaker}
+\end{equation}
+where $ \Delta^m y_i^{*}$ are $m$-th degree finite differences and $\lambda$ -- the parameter controlling the trade-off between infidelity and smoothness. Schoenberg used this idea and showed that splines occur naturally as a result of minimizing \eqref{eq:whittaker} if the roughness is measured as the $m$-th derivative instead. This was then explicitly formalized for $m=2$ by Reinsch \cite{REINSCH1967} and proved to be a very effective way of smoothing noisy data. 
+\section{Trade-off Parameter}
+A crucial part of this method is to determine the best balance between smoothing and adherence to the data, as both overfitting and underfitting are undesirable. Reinsch described a straightforward algorithm for finding an optimal parameter $\lambda$ controlling such trade-off \cite{REINSCH1967}, but it required knowledge of the noise variance -- information not always available for real-life data. Several more flexible methods for estimating this parameter have been developed since then \cite{LEE2003139}, one of the most well-known being the \textit{Generalized Cross-Validation} method (GCV), introduced by G. Wahba et al \cite{Golub01051979}. Although it has been proven, both theoretically and empirically, to produce good values of $\lambda$, GCV can occasionally (in less than 10$\%$ of cases) results in severe undersmoothing. A simple modification has been suggested \cite{kim-gu} to solve this issue -- changing the GCV function by a small parameter $\alpha$. However, the value of $\alpha$ appears to be mostly ad hoc, and extensive research has not been done on the topic.
+\section{GAMs}
+Since then, smoothing splines have been widely used in fields like engineering, image processing, data science, and, notably, in \textit{Generalized Additive Models} (GAMs). To understand what they are, \textit{Generalized Linear Models} (GLMs) need to be introduced. GLM is a generalization of ordinary linear regression that allows for the dependent variable to have a non-normal distribution. It is easier explained through an example -- imagine a linear regression model that predicts a $0.1$ decrease in average grade at university for each day spent partying. While it would certainly be correct to assume that a lot of partying negatively affects one's academic abilities, at some point it would impossibly predict the average grade to be negative. Even more starkly, imagine a linear model that is supposed to predict the probability of some event and is thus limited to values from $0$ to $1$. GLMs account for this using \textit{link functions} that transform the output of the linear model to lie in the acceptable range of some distribution. GAMs are an extension of GLMs, where the predicted variable depends linearly on some smooth functions of the independent variables rather than on the variables themselves. Smoothing splines commonly serve as the aforementioned smooth functions. Generalized Additive Models are a very well-studied topic, the full breadth of which is definitely out of scope of this thesis, but they are commonly used in ecology, environmental science, finance, interpretable machine learning, etc. 
+
+\section{Further Developments}
+Almost 50 years have passed since Wahba's paper, and it would be surprising if nothing novel was invented in that time -- one of the more "modern" developments are \textit{P-splines} (penalized B-splines), introduced by Eiler and Marx \cite{Pspline} in 1996. Similarly to smoothing splines, they utilize a roughness penalty and combine it with \textit{B-spline} (basis spline) regression. As the name implies, B-splines are constructed as a linear combination of basis functions defined over a set of knots -- points where the pieces of the spline are connected. They have many advantages: better numerical stability, algorithms such as De Boor's algorithm \cite{de1978practical} for efficient computation, easier knot insertion, higher-degree spline computation, etc. The choice of knots for a B-spline is important -- too many lead to overfitting, too few -- to underfitting. P-splines solve this problem of optimal knot selection by taking a relatively large number of knots and introducing a roughness penalty similar to the one in \eqref{eq:whittaker}. Among the most important advantages of P-splines are the lack of boundary issues and computational efficiency essential for working with very large datasets.
+
+Other later development are Thin Plate Regression Splines \cite{thinplate}. Their connection to smoothing splines is even more evident, since thin plate splines, the core of this method, are a multivariate version of smoothing splines, as, for example, for a plate on a 2D domain $\Omega \in \mathbb{R}^2$, they arise from minimizing this function:
+\begin{equation}
+\sum_{i=1}^{K} \left\lVert y_i - f(x_i) \right\rVert^2
++ \lambda \iint_{\Omega} \left[
+\left(\pdv[2]{f}{x_1}\right)^2
++ 2\left(\frac{\partial^2 f}{\partial x_1 \partial x_2}\right)^2
++ \left(\frac{\partial^2 f}{\partial x_2^2}\right)^2
+\right] \, \dd x_1 \, \dd x_2
+\label{eq:thinplate}
+\end{equation}
+Loosely speaking, thin plate regression splines are obtained by transforming and truncating the basis derived from solving \eqref{eq:thinplate}, and also enjoy the benefits of computational efficiency, allowing them to be used on large volumes of data.
+Both of these splines are available in a widely used R package \texttt{mgcv} for fitting GAMs, with thin plate regression being the default one.
+\section{Aim of the Thesis}
+As can be observed, there has been considerable research done on noisy data smoothing -- it, however, did not make smoothing splines obsolete. Although they may rarely be the default method for data smoothing today, at least not in the way described by Wahba in \cite{Craven1978} and, consequently, in this thesis, they provided a basis for the methods mentioned above and are crucial in understanding penalized smoothing. In addition, they are extensively researched, easily implemented, and perfectly fit the needs of this thesis. It was done in collaboration with Carrier -- a multinational corporation that specializes among other things in heating, ventilation, and air conditioning (HVAC), and refrigeration equipment. While Carrier has established methods for smoothing data, so far they have been based more on engineering judgment rather than a strict mathematical framework. This thesis aims to cover this gap and explore a more rigorous approach to noisy data by means of smoothing splines with GCV as a method to determine the optimal tradeoff parameter. Chapter 2 presents Reinsch's original formulation of the algorithm as well as Wahba's method of determining the optimal trade-off parameter partially based on it. A single algorithm for the cubic smoothing spline combining both approaches is constructed. In Chapter 3 numerical experiments on synthetic data are performed to explore the method's efficiency, determine limitations, and provide a workflow for establishing the optimal spline degree using a set of statistical tests. Finally, Chapter 4 applies these findings to a real-life dataset provided by Carrier to determine the optimal smoothing and obtain the closest possible estimation of the noise variance.
+
+\chapter{Methods}
+\section{Problem Formulation}
+In the process of working with data, we usually have a set of pairs ${(t, y)}$, with ${t}$ being some independent variable that influences the dependent variable ${y}$. Although ${t}$ can be anything, from weight to age to a zodiac sign, this thesis will explore time series data, where the set ${t}$ represents points in time, and ${y}$ -- some values measured at these points. These measurements can certainly be taken sporadically, at random intervals, here, however, mainly data collected at equally spaced intervals will be examined.
+
+While there are a lot of ways to process data, the main method of this thesis is curve fitting -- constructing a function (curve) that best fits a set of data points, either through $\textit{interpolation}$, where the function fits the data exactly, or through $\textit{smoothing}$, where some infidelity is allowed. Curve fitting allows us to get a continuous function from discrete data, through which we can examine the relationship between the variables, observe some patterns, estimate the underlying function, etc.
+
+The datasets we will be investigating are assumed to be noised by various external factors and hence have the form of 
+\begin{equation*}
+    {y}(t) = {g}(t) + {\epsilon}(t),
+\end{equation*}
+where ${g}(t)$ is the sought-after underlying function and ${\epsilon}(t)$ -- the noise. We assume $\epsilon(t)$ to be a white noise process. 
+\begin{definition}[\textit{White Noise Process}] White noise is a signal with equal intensity (amplitude) for all frequencies or, mathematically, a random process such that \begin{equation*}
+    \text{E}[{\epsilon}(t)]= 0, \: \text{Var}[{\epsilon}(t)] = \sigma^2, \: \text{and} \:\text{Cov}[{\epsilon}(t), {\epsilon}(s)] = 0\: \forall \: t \neq s.
+\end{equation*} 
+\end{definition}
+\noindent And ${g}(t)$ is assumed to belong to belong to $W_2^{(m)}$, where
+\begin{equation*}
+    W_2^{(m)} = \{g: g^{(v)} - \text{abs. cont.},\: v = 0, 1,..., m-1;\: g^{(m)} \in \mathbb{L}^2[a,b]\}
+\end{equation*}
+or, all functions $g$, such that $g$ and its derivatives up to $m-1$ are absolutely continuous, and its $m-$th derivative is square integrable on the interval $[a, b]$.
+\begin{definition}[\textit{Absolute continuity}]
+A function \(f:[a,b]\to[0,\infty]\) is absolutely continuous if for all \(\epsilon>0\) and all \(n>0\) there exists \(\delta>0\) such that whenever
+\[
+\{(a_i,b_i)\}_{i=1}^n \subset [a,b]
+\]
+is a pairwise disjoint collection of open intervals with
+\[
+\sum_{i=1}^n (b_i-a_i)<\delta,
+\]
+we have
+\[
+\sum_{i=1}^n \lvert f(b_i)-f(a_i)\rvert < \epsilon.
+\]
+\end{definition}
+\noindent $W_2^{(m)}$ here describes a \textit{Sobolev space}, but its more in-depth definition and properties are beyond the scope of this thesis and are not examined in the referenced papers nor will be here.
+
+This white noise prevents us from interpolating the set of measurements $y(t)$ directly, hence, some degree of infidelity to the data must be introduced to find a close approximation to $g(t)$. One way of calculating such an optimal degree and constructing the function approximation is through smoothing splines.
+
+\section{Spline Functions}
+Before moving on to smoothing splines, splines in general should be given a formal definition.
+\begin{definition}[\textit{Spline}]Given some interval $[a, b]$ and its partition ${a = t_0 < t_1 … < t_{n-1}< t_n = b}$ into $n$ subintervals, where $K = \{t_0,..., t_n\}$ is the set of $\textit{knots}$, a spline $S$ is a function defined piecewise on each subinterval $[t_i, t_{i+1}]$ with a polynomial $P_i$ of some degree. \end{definition}
+\noindent Certain continuity constraints at the knots and boundary conditions are established as well. These constraints, together with the degree and representation of the polynomials $P_i$ define the type of a spline. One of the most commonly used splines is the cubic spline \cite{bulirschStoer}, as it provides a high degree of accuracy while keeping computational costs low:
+\begin{definition}[\textit{Cubic spline}]
+Given the set of knots $K$ on the interval $[a, b]$, a cubic spline $S_K$ is a real function $S_K: [a, b]\to \mathbb{R}$ with the properties: 
+\begin{enumerate}[label=\alph*)]
+    \item $S_K \in C^2[a, b]$, i.e. twice continuously differentiable on $[a, b].$ Thus $P_i(t_i) = P_{i+1}(t_i)$, $P_i'(t_i) = P_{i+1}'(t_i)$, and $P_i''(t_i) = P_{i+1}''(t_i)$, meaning that the polynomials, as well as their first and second derivatives, are equal at their binding knots.
+    \item Every $P_i$ is a polynomial of degree three.
+\end{enumerate}
+\end{definition}
+\noindent These conditions are, however, not enough for $S_K$ to be uniquely determined -- we need some additional requirements. Next section shows that a type of cubic spline with the necessary additional conditions occurs naturally in the task of smoothing noisy data with smoothing splines.
+\section{Smoothing Splines}
+Returning to the problem of reconstructing $g(t)$ from $y(t) = g(t) + \epsilon(t)$, we strive to find the optimal function $g_{n,\lambda}$, among all functions $f(t)$ suitable in a way specified below, that will be sufficiently smooth while simultaneously not drastically deviating from the given data points. The deviation between $f(t)$ and ${y}(t)$ is defined as the square error $\sum_{i=1}^{n}{(f(t_i) - {y}_i)^2}$, with ${y}_i = {y}(t_i)$, while the "roughness" is calculated as $\int_{t_0}^{t_n}{(f^{(m)}(t))^2dt}$, where $t_0, t_n$ -- first and last time points respectively. The idea behind finding $g_{n,\lambda}$ is to minimize both values simultaneously, while controlling the relative importance of each.
+
+Before moving on to the desired method, an introduction to Reinsch's \cite{REINSCH1967} work should be given. He proposes to control the amount of smoothing manually with the help of a parameter $S$, which restricts the amount of deviation from the data allowed. The idea behind it is that, knowing the standard deviations of each ${y}_i$, a natural interval for $S$ can be found and the desired function $g_{n,\lambda}$ can be determined with a simple and computationally efficient algorithm, which was important considering the amount of computational power available in 1967, when the paper was written. Reinsch suggests finding the optimal function by minimizing
+\begin{equation*}
+\int_{t_0}^{t_n}{(f''(t))^2dt}
+\end{equation*}
+among all functions $f(t)$ such that
+\begin{equation}
+\sum_{i=1}^{n}\frac{(f(t_i) - {y}_i)^2}{{\delta}{y}_i}\leq S.
+\label{eq:constraint}
+\end{equation}
+The second derivative is used in the majority of research on smoothing splines, as it yields a simple algorithm that produces satisfactory results. The natural interval for $S$ can be determined if we assume the white noise to follow a normal distribution $N(0,\sigma^2)$ -- hence, being white Gaussian noise. This way, if we choose ${\delta}{y}_i$ to be the estimate of the standard deviation of the ordinate ${y}_i$, we will get the sum of squared independent standard normal variables, which define a \textit{Chi-squared} distribution $\chi^2_N$ with mean $N$ and variance $2N$, where $N$ -- number of data points. Thus, we can pick a good choice of $S$ from the natural interval 
+\begin{equation*}
+    N-\sqrt{2N}\leq S \leq N+\sqrt{2N}.
+\end{equation*}
+To find a good estimate of  $g_{n,\lambda},$ Reinsch then optimizes the following Lagrangian in which the constraint \eqref{eq:constraint} is incorporated using a Lagrange multiplier $\lambda$:
+\begin{equation}
+    \mathcal{L}(f, \lambda, z)=\int_{t_0}^{t_n}{f''(t)^2\dd t} + \lambda \left(\sum_{i=1}^{n}(\frac{f(t_i) - {y}_i}{{\delta}{y}_i})^2 - S + z^2\right).
+\label{eq:reinsch}
+\end{equation}
+The parameter $z$ is used as an auxiliary variable to construct an equality constraint from the inequality one. 
+
+The process of constructing the desired function is not described in \cite{REINSCH1967}, therefore, it is reasonable to discuss it more thoroughly. Before that, however, we need to introduce several concepts.
+\begin{definition}[\textit{Functional}]
+A functional $f$ is a linear operator with domain in a vector space $X$ and range in the scalar field $K$ of $X$ \cite{kreyszig1978introductory}; thus
+\[
+f: X \to K,
+\]
+where $K = \mathbb{R}$ if $X$ is real and $K = \mathbb{C}$ if $X$ is complex. 
+\end{definition} 
+\noindent In essence, a functional is a kind of function, where the independent variable is itself a function -- while a function maps a number to a number, a functional maps a function to a number. Thus, our minimization problem \eqref{eq:reinsch} is a problem of minimizing a functional. We solve it similarly to how we find the minimums of normal functions -- using a derivative, but instead of varying the $x$ coordinate, we vary the function $f$ using some arbitrary function $h$. 
+\begin{definition}[\textit{G\^{a}teaux derivative}]
+The {G\^{a}teaux derivative} of a functional $J(f)$ is defined as
+\begin{equation*}
+    \delta J[f,h] =\lim_{t\to0} \frac{J(f+th)-J(f)}{t}.
+\end{equation*}
+\end{definition}
+\noindent Finding the stationary points of $\mathcal{L}(f, \lambda, z)$ using this method will demonstrate how a third degree spline (or a spline of degree $2m-1$ in a case of minimizing the derivative of degree $m$ in \eqref{eq:reinsch}) naturally occurs, as well as give us the necessary additional constraints for its construction.
+
+Taking the G\^{a}teaux derivative of \eqref{eq:reinsch} with respect to $f$, we get:
+\begin{equation*}
+     \delta\mathcal{L}[f,h]=\int_{t_0}^{t_n}2{f''(t)h''(t)\dd t} + \lambda \left(\sum_{i=1}^{n}2(\frac{f(t_i) - {y}_i}{{\delta}{y}_i})h(t_i) \right),
+\label{eq:reinsch2}
+\end{equation*}
+where $h\in W^2_2$.
+
+Integrating the first term by parts and substituting the result, we obtain:
+\begin{equation}
+\begin{split}
+    &\sum_{i=0}^{n}\left(f''(t_i)_{+}h'(t_i)_{+}- f''(t_i)_{-}h'(t_i)_{-} \right)+
+    \sum_{i=0}^{n-1}\int_{t_i}^{t_{i+1}}{f''''(t)h(t)\dd t}\\-
+    &\sum_{i=0}^{n}\left(f'''(t_i)_{+}h(t_i)_{+}- f'''(t_i)_{-}h(t_i)_{-} +\lambda (\frac{f(t_i) - {y}_i}{{\delta}{y}_i})h(t_i)\right)=0.
+\end{split}
+\label{eq:ojsuka}
+\end{equation}
+The continuity of $f$, combined with the fact that \eqref{eq:ojsuka} must hold for all admissible $h$, allows us to derive the following equations defining $f$:
+\[
+f''''(x) = 0, \quad t_i < t < t_{i+1}, \quad i = 0, \dots, n-1,
+\]
+\begin{equation}
+f^{(j)}(t_i)_- - f^{(j)}(t_i)_+ = \quad 
+\begin{cases}
+0, & j = 0,1, \quad (i = 1, \dots, n-1), \\
+0, & j = 2, \quad (i = 0, \dots, n), \\
+\lambda\frac{f(t_i) - {y}_i}{{\delta}{y}_i^2}, & j = 3, \quad (i = 0, \dots, n), \qquad \qquad (*)
+\end{cases}
+\label{eq:ept}
+\end{equation}
+with $f^{(j)}(t_i)_{\pm}=
+\lim_{h \to 0}f^{(j)}(t_i\pm h).$
+It can be noted that this result differs slightly from what Reinsch obtained in \cite{REINSCH1967}, namely, in $(*)$ his difference is double that of ours. Although it is unclear whether this discrepancy is caused by different methods of computation, as Reinsch does not provide any, or simply a typo, and does not influence the final outcome, it still affects the subsequent calculations.
+
+From \eqref{eq:ept} we observe that the desired function is composed of cubic polynomials -- the assumed form $f_i(t) = a_i+b_i(t-t_i)+c_i(t-t_i)^2+d_i(t-t_i)^3$ allows us to obtain convenient formulas for its coefficients:
+\begin{equation}
+\hspace*{-3.3cm}
+\begin{aligned}
+&{c}_0={c}_n=0,\\
+&{d}_i=\dfrac{{c}_{i+1}-{c}_i}{3{h}_i}, \quad
+{b}_i=\dfrac{{a}_{i+1}-{a}_i}{{h}_i}-{c}_i {h}_i-{d}_i {h}_i^2,\qquad i=0,\ldots,n-1,\\
+&\vb{Tc}=\vb{Q}^\top \vb{a},\qquad \qquad \qquad \qquad\:(i)\\
+&2\vb{Qc}=\lambda \vb{D}^{-2}(\vb{y}-\vb{a}), \qquad \qquad (ii)
+\end{aligned}
+\end{equation}
+where
+\begin{align*}
+&{h}_i=t_{i+1}-t_i,\quad
+\vb{c}=(c_1,\ldots,c_{n-1})^\top ,\quad
+\vb{y}=(y_0,\ldots,y_n)^\top ,\\
+&\vb{a}=(a_0,\ldots,a_n)^\top ,\quad
+\vb{D}=\operatorname{diag}(\delta y_0,\ldots,\delta y_n),\\[4pt]
+&\vb{T}\quad \text{is tridiagonal of order $n-1$ with}\quad
+t_{i,i}=\dfrac{2({h}_{i-1}+{h}_i)}{3},\quad
+t_{i,i+1}=t_{i+1,i}=\dfrac{{h}_i}{3},\\
+&\vb{Q}\quad \text{is tridiagonal $n+1 \times n-1$ with}\quad
+q_{i-1,i}=\dfrac1{{h}_{i-1}},\quad
+q_{i,i}=-\dfrac1{{h}_{i-1}}-\dfrac1{{h}_i},\quad
+q_{i+1,i}=\dfrac1{{h}_i}.
+\end{align*}
+ Multiplying $(ii)$ by $\vb{Q^\top D}^2$ and substituting with $(i)$ allows us to separate $c$:
+\begin{equation}
+\left(2\vb{Q^\top  D}^2\vb{Q} + \lambda \vb{T}\right)\vb{c} = \lambda \vb{Q}^\top\vb{y},
+\label{eq:formulas}
+\end{equation}
+inserting it back into $(ii)$ gives us a formula for $a$, which will be very important for subsequent computations:
+\begin{equation}
+\vb{a} = \left[\vb{I} - 2\vb{D}^2\vb{Q}(2\vb{Q^\top  D}^2 \vb{Q} + \lambda \vb{T})^{-1}\vb{Q}^\top \right]\vb{y}.
+\label{eq:equation for a}
+\end{equation}
+ Although these formulas differ from those given by Reinsch \cite{REINSCH1967}, they produce the same final result, as the difference in the trade-off parameters is compensated for by the difference in the computation of the spline coefficients. More precisely, the change in condition $(*)$ in \eqref{eq:ept} yields $\lambda$ equal to twice the $\tilde \lambda$ of Reinsch. Substituting $2\tilde \lambda$ into the formulas of the coefficients that depend on it, we get \[\begin{aligned}
+\left(2\vb{Q^\top  D}^2\vb{Q} + 2\tilde \lambda \vb{T}\right)\vb{c} = 2\tilde \lambda \vb{Q}^\top\vb{y} &\implies \left(\vb{Q^\top  D}^2\vb{Q} +\tilde \lambda \vb{T}\right)\vb{c} = \tilde\lambda \vb{Q}^\top\vb{y},\\
+2\vb{Qc}=2\tilde\lambda \vb{D}^{-2}(\vb{y}-\vb{a}) &\implies \vb{Qc}=\tilde\lambda \vb{D}^{-2}(\vb{y}-\vb{a}).
+\end{aligned}
+\]
+ Therefore, despite the slight difference in the calculations, the final spline is equal to that obtained by Reinsch. For that reason, his formulation will be used from now on for convenience, without differentiating $\lambda$ and $\tilde\lambda.$
+ 
+\indent In brief, to find the optimal parameter $\lambda$, Reinsch then takes the derivatives of \eqref{eq:reinsch} with respect to $z$ and $\lambda$, resulting in the following conditions, respectively. \begin{equation*}
+\lambda z = 0,
+\end{equation*}
+\begin{equation}
+\sum_{i=1}^{n}\left(\frac{f(t_i) - {y}_i}{{\delta}{y}_i}\right)^2 = S - z^2,
+\label{eq:minreinsch}
+\end{equation}
+ where $\lambda=0$ leads to the cubic spline reducing to a straight line. Thus, taking $z=0$, we modify the left-hand side of \eqref{eq:minreinsch} using \eqref{eq:formulas} and \eqref{eq:equation for a}, which gives
+ \begin{equation*}
+F(\lambda)^2=||\vb{DQ(Q^\top D^2Q+\lambda T)^{-1}Q^\top y}||_2^2.
+ \end{equation*}
+ The optimal $\lambda$ is then found as the root of $F(\lambda)=\sqrt{S}$ using Newton's method. This exact formulation of the algorithm is inefficient in our problem of real life data, as it requires additional work to manually pick the amount of smoothing, which, even given an interval of "good" values, cannot be classified as optimal, not to mention that the $\delta y_i$ values necessary to determine this interval will most likely be unavailable. Moreover, their estimation is often one of the goals of smoothing. This formulation, however, establishes the basis for a more sophisticated algorithm discussed in the following sections.
+\section{Cross-Validation}
+As discussed in the previous section, one of the main limitations of Reinsch's method is its reliance on a very accurate estimation of the noise variance, as well as a correctly selected amount of smoothing. These problems, of course, prevent it from being conveniently and efficiently applied to more than one dataset at a time. P. Craven and G. Wahba \cite{Craven1978} solve this issue by suggesting an automatic way of determining the optimal smoothing level. The problem $(1)$ is described by them in a slightly different manner: Find a function $f\in W_2^{(m)}$ to minimize
+\begin{equation}
+    \lambda\int_{0}^{1}{f^{(m)}(u)^2\dd u} + \frac{1}{n}\sum_{i=1}^{n}({f(t_i) - {y}_i})^2 .
+\label{eq:wahba}
+\end{equation}
+We are not solving a constrained minimization problem here, instead simply minimizing both roughness and infidelity, while controlling the significance of each with the parameter $\lambda$, which is introduced as just the trade-off parameter, instead of a Lagrange multiplier for a constrained problem, since there is no constraint we need to satisfy. The degree of the derivative is also not specified. Although the formulations are different, the task remains the same -- finding the optimal parameter $\lambda$ and constructing a function $g_{n,\lambda}$ minimizing \eqref{eq:wahba}. We will hence adhere to Craven and Wahba's notation to avoid confusion.
+
+The idea behind finding the optimal trade-off parameter is quite trivial -- minimizing the true mean square error over the data points:
+\begin{equation}
+   R(\lambda) =  \frac{1}{n}\sum_{i=0}^n(g_{n,\lambda}(t_i)-g(t_i))^2.
+\label{eq:true mse}
+\end{equation}
+This is, of course, absurd, since given $g(t)$ there would be no need for this minimization whatsoever. For that reason, an approximation to $R(\lambda)$ should be constructed. Although \cite{Craven1978} also provides such an approximation $\hat{R}(\lambda)$ in the case where the standard deviation is known, we will not focus on it, as the main purpose of this thesis is to find this approximation purely from the given set of data points. We could attempt to calculate the standard deviation directly from the data, but it could be unreliable if the sample is small, contains extreme outliers, etc. In addition, \cite{Craven1978} states that a good value of $\sigma^2$ is required for the minimizer of $\hat{R}({\lambda})$ to be close to that of $R(\lambda)$, especially for small $\sigma^2$, which makes this method entirely too risky for real-life data. To avoid the need for these parameters, \cite{Golub01051979} introduces the Generalized Cross-Validation (GCV) method which constructs a function 
+\begin{equation}
+V(\lambda)=\frac{\frac{1}{n}||(\vb{I}-\vb{A})\vb{y}||^2}{(\frac{1}{n}\text{Tr}(\vb{I}-\vb{A}))^2},
+\label{eq:gcvv}
+\end{equation}the minimizer of which proves to be a good estimate of the minimizer of $R(\lambda)$ in the sense described in the next subsection.
+Before obtaining the GCV, ordinary cross-validation function should be constructed, the former being a computationally efficient and rotation-invariant version of the latter. 
+\begin{definition}[\textit{Rotational invariance}]
+A function $f(x)$ is rotation-invariant if $ f(R {x}) = f({x}) $ for all rotation matrices $ R $. 
+\end{definition}
+\noindent We can take the distance from a point to the origin in $\mathbb{R}^2$ as a simple example -- regardless of how we rotate the coordinate system, this value will stay the same.
+\subsection{Construction of GCV}
+We first define a $n \times n$ matrix $\vb{A}(\lambda)$, such that \begin{equation}
+\begin{pmatrix}
+g_{n,\lambda}(t_1) \\
+\vdots\\
+g_{n,\lambda}(t_n)
+\end{pmatrix}
+ = \vb{A}(\lambda)
+\begin{pmatrix}
+{y}_1 \\
+\vdots\\
+{y}_n
+\end{pmatrix}
+\label{eq:matrixA}
+\end{equation}
+Such a matrix exists since $g_{n,\lambda}$ is a linear function of ${y}_1,..., {y}_n$ for each $t_i$. It is useful to note that, since $g_{n,\lambda}(t_i) = {a}_i$ for all $i$ from $1$ to $n$, where ${a}_i$ --  coefficient of the polynomial $P_i$ according to Reinsch's notation, $\vb{A}(\lambda){\vb{y}} = {\vb{a}}$. This fact is crucial for connecting Wahba's GCV with Reinsch's computation of the cubic spline in \cite{REINSCH1967}.
+
+The idea behind ordinary cross-validation $V_o(\lambda)$ is "leaving one out": we define $g_{n,\lambda}^{(j)}(t_i)$ as the minimizer of 
+\begin{equation*}
+    \lambda\int_{0}^{1}{f^{(m)}(u)^2\dd u} + \frac{1}{n}\sum_{\substack{i=1 \\ i\ne j}}^{n}({f(t_i) - {y}_i})^2 
+    \label{eq:leaevoneout}
+\end{equation*}
+and strive to minimize
+\[V_o(\lambda)=\frac{1}{n}\sum_{i=0}^n(g_{n,\lambda}^{(j)}(t_i)-{y}_i)^2.\]
+An important property of $g_{n,\lambda}^{(j)}(t)$ is that it is a solution to the $n$-data point minimization problem \eqref{eq:wahba} with point ${y}_j$ replaced by $g_{n,\lambda}^{(j)}(t_j)$:
+\begin{lemma} 
+Let $n\geq m$ and let $g_{n,\lambda}(t, j, z_j)$ be the solution to the problem: \[ \underset {f\in W_2^{(m)}} {\textnormal{ minimize}} \quad
+\lambda\int_{0}^{1}{f^{(m)}(u)^2\dd u} + \frac{1}{n}\qty[{(f(t_j) - z_j})^2+\sum_{\substack{i=1 \\ i\ne j}}^{n}({f(t_i) - {y}_i})^2]. 
+\]
+Then \[g_{n,\lambda}(t, j, g_{n,\lambda}^{(j)}(t_j))=g_{n,\lambda}^{(j)}(t).\]
+\end{lemma}
+\noindent This property, together with the fact that for each $t_i$ the function $g_{n,\lambda}(t_i)$ depends linearly on ${y}_i$ allows us to do the following computations: Let $z_j=g_{n,\lambda}^{(j)}(t)$ and $a_{ji}$ --  elements of the matrix $\vb{A}(\lambda)$, then:
+\[
+z_j = g_{n,\lambda}(t_j, j, z_j)=\sum_{\substack{i=1 \\ i\ne j}}^{n}a_{ji}y_i+a_{jj}z_j = \sum_{\substack{i=1 \\ i\ne j}}^{n}a_{ji}y_i + a_{jj}y_j-a_{jj}y_j+a_{jj}z_j=\sum_{i=1}^na_{ji}y_i+a_{jj}(z_j-y_{j}),
+\]
+Rearranging this expression, we obtain $z_j-y_j=\frac{\sum_{i=1}^na_{ji}y_i-y_j}{1-a_{jj}}$. Finally, taking the mean of the squared sum over all $j$, we derive the ordinary cross-validation function:
+\begin{equation}
+   V_o(\lambda) =
+\frac{1}{n}\sum_{j=1}^n
+\left(
+\frac{\sum_{i=1}^na_{ji}{y}_i-{y}_j}{1-a_{jj}}
+\right)^2,
+\label{eq:ordcv}
+\end{equation}
+Noticeably, this formula is quite complicated to minimize and also cannot be used on non-equally distributed data. The reason for the latter is that in the situation of equidistant points, each measurement is equally important, which is false for a non-uniform grid -- a point in a sparse region may contain more information than somewhat redundant ones in a dense region. For that reason, weights are added, which control each point's contribution -- that makes the definition of $V_o(\lambda)$ different, and hence the formula $\eqref{eq:ordcv}$ irrelevant.
+
+Generalized cross-validation copes with the problems mentioned above --  it turns the by-element formula \eqref{eq:ordcv} into a convenient matrix computation. We obtain it by considering a periodic problem -- finding a minimizer of \eqref{eq:wahba} among all periodic functions $f$ with integral 0, i.e., such that $\int_{t_0}^{t_n}f^{(j)}(u)du=0\text{ for } j=0,\ldots,m$. Wahba \cite{Craven1978} finds that in this case, the matrix $\vb{A}(\lambda)$ has the form $\vb{KM}^{-1}$, where $\vb{K},\vb{M}$ are $n \times n$ matrices defined as
+\begin{equation*}
+\begin{aligned}
+&{K}_{jl} = (-1)^{m-1} k_{2m}(t_j ,t_l),\\
+&\vb{M}=\vb{K}+n\lambda \vb{I},
+\end{aligned}
+\end{equation*}
+where $k_{2m}(t_j ,t_l)$ is a \textit{Bernoulli kernel}:
+\[
+k_r(s,t) = - \sum_{\substack{v=-\infty \\ v \ne 0}}^{\infty}\frac{1}{(2\pi i v)^r} e^{2\pi i v (s - t)}.
+\]
+Because $k_r(s,t)$ is periodic with period 1, it follows that on an equidistant grid $\vb{K}$ and therefore $\vb{M}$ are circulant matrices.
+\begin{definition}[\textit{Circulant matrix}]
+A circulant matrix is a square matrix all rows of which are composed of the same elements, and each row is the preceding row rotated one element to the right:
+\[
+\vb{K} =
+\begin{pmatrix}
+c_0 & c_3 & c_2 & c_1 \\
+c_1 & c_0 & c_3 & c_2 \\
+c_2 & c_1 & c_0 & c_3 \\
+c_3 & c_2 & c_1 & c_0
+\end{pmatrix}.
+\]
+\end{definition}
+\noindent The inverse as well as the product of circulant matrices is also a circulant matrix. Thus, the constant diagonal of the circulant $\vb{A}(\lambda)$ allows $a_{jj}$ to be represented as $\frac{1}{n}\sum_{i=1}^na_{ii}$. That turns $\eqref{eq:ordcv}$ into the desired form:
+\begin{equation}
+V_o(\lambda) =\frac{\frac{1}{n}||(\vb{I}-\vb{A})\vb{y}||^2}{(\frac{1}{n}\text{Tr}(\vb{I}-\vb{A}))^2},
+\label{eq:GCV}
+\end{equation}
+where Tr$(\vb{I}-\vb{A})$ is the \textit{trace} of the matrix $\vb{I}-\vb{A}$, i.e. the sum of its diagonal.
+
+Although $V_o(\lambda)$ in \eqref{eq:GCV} has the same form as GCV in \eqref{eq:gcvv}, it is still an ordinary cross-validation function, as it is only valid for a uniform grid. The idea behind extending this formula for a non-uniform grid and obtaining generalized cross-validation is to rotate the coordinate system so that the matrix $\vb{A}(\lambda)$ becomes circulant, and change $\vb{y}_i$ accordingly. Another important property of circulant matrices is that they all share a well-known set of eigenvectors \cite{circulant}:
+\begin{lemma}\textit{
+    Every circulant matrix $\vb{K}$ has a set of eigenvectors $\vb{W}$, where ${W}_{jk}=\frac{1}{\sqrt{n}}e^{2\pi ijk/n}$.}
+\end{lemma}
+\noindent It can thus be expressed in the form $\vb{K}=\vb{WDW}^*$, where $\vb{D}$ -- some diagonal matrix. Any matrix of such a form is circulant. Since $\vb{A}(\lambda)$ is symmetric, we can diagonalize it as $\vb{A}(\lambda)=\vb{UDU}^\top $, where $\vb{U}$ is an orthogonal matrix. Multiplying both sides by $\vb{\Gamma}=\vb{WU}^\top $, we get a rotation $\hat{\vb{A}}(\lambda)$ of a matrix $\vb{A}(\lambda)$:
+\[
+\hat{\vb{A}}(\lambda)=\vb{\Gamma A}(\lambda)\vb{\Gamma}^\top =\vb{WU^\top UDU^\top UW^\top} =\vb{WDW}^\top ,
+\]
+Thus, $\hat{\vb{A}}(\lambda)$ is circulant. Letting $\hat{\vb{y}}=\vb{\Gamma y}$, the smoothed $\hat{\vb{y}}$ are:
+\[\vb{\Gamma} {g_{n,\lambda}(t)}=\vb{\Gamma A}(\lambda)y=\vb{\Gamma A}(\lambda)\vb{\Gamma^\top \Gamma y}= \hat{\vb{A}}(\lambda)\hat{\vb{y}}.\]
+Applying \eqref{eq:GCV} to the modified data, we obtain:
+\[
+{V}_o(\lambda)=\frac{\frac{1}{n}||\hat{\vb{y}} -\hat{\vb{A}}\hat{\vb{y}}||^2}{(\frac{1}{n}\text{Tr}(\vb{I}-\hat{\vb{A}}))^2}=\frac{\frac{1}{n}||\vb{\Gamma} \vb{y}- \vb{\Gamma Ay}||^2}{(\frac{1}{n}\text{Tr}(\vb{I}-\vb{\Gamma A\Gamma^\top}))^2}=\frac{\frac{1}{n}||\vb{\Gamma}(\vb{I} -\vb{A})\vb{y}||^2}{(\frac{1}{n}\text{Tr}[\vb{\Gamma}(\vb{I}-\vb{A})\vb{\Gamma}^\top ])^2}.
+\]
+\begin{lemma}
+\textit{The trace of a matrix is invariant under cyclic shifts, that is} \[
+\textnormal{Tr}(\vb{ABC})=\textnormal{Tr}(\vb{CAB})=\textnormal{Tr}(\vb{BCA}).
+\]
+\end{lemma}
+\noindent Using this lemma together with the norm-preserving property of orthogonal matrices, we conclude that ${V}_o(\lambda)$ holds for non-uniform grids and is thus equal to $V(\lambda)$ in \eqref{eq:gcvv}.
+
+\subsection{Optimality of the Trade-Off Parameter}
+Chapter 4 of the paper \cite{Craven1978} provides a proof of the optimality of the trade-off parameter $\hat{\lambda}$ when computed as the minimizer of $V(\lambda)$ in the following sense.
+\begin{theorem}\textit{
+Let $g \in W^{m}_2$, and $\{t_i\}_{i=1}^n$ satisfy $\frac{i}{n}\int_0^{t_i}w(u)\dd u$, where $w(u)$ -- a strictly positive continuous weight function. Then there exists a sequence $\hat{\lambda}=\hat{\lambda}(n)$ of minima of $\textrm{E}V(\lambda)$ such that
+\begin{equation*}
+    \lim_{n \to \infty}\frac{\textnormal{E}R({\hat{\lambda})}}{\min_\lambda \textnormal{E}R(\lambda)}= 1,
+\end{equation*}}
+\end{theorem}
+\noindent where E represents expectation and $R(\lambda)$ -- true mean square error as defined in equation \eqref{eq:true mse}. Thus, the true MSE when $\lambda$ is estimated from the GCV is close to the minimum possible MSE. In addition, the superiority of this method over Reinsch's estimate was shown clearly in the paper; it was also compared by G. Wahba in \cite{WahbaGCVvsGML} to Generalized Maximum Likelihood (GML) -- estimate introduced by her in the same article as a generalization of ML estimates. Wahba found GCV to produce consistently better results than GML or, more precisely:\\
+\textit{"Mixed results were obtained for n = 32, GCV was somewhat better than GML for n = 64, and GCV was decidedly superior for n = 128. In the n = 32 case GCV was better for smaller $\sigma^2$ and the comparison close for larger $\sigma^2$".}
+\section{Implementation for the Linear and Cubic Splines}
+Although we have obtained the formula for GCV, using it to find the optimal parameter $\lambda$ requires a lot of preparation. 
+\begin{equation*}
+V(\lambda) =\frac{\frac{1}{n}||(\vb{I}-\vb{A})\vb{y}||^2}{(\frac{1}{n}\text{Tr}(\vb{I}-\vb{A}))^2},
+\end{equation*}
+The most obvious obstacle is finding the matrix $\vb{A}(\lambda)$. We know that $\vb{A}(\lambda)\vb{y}=\vb{a}$, therefore, for a cubic spline \eqref{eq:equation for a} gives \begin{equation}
+\vb{I}-\vb{A}=\vb{Q}(\vb{Q^\top Q}+\lambda \vb{T})^{-1}\vb{Q}^\top ,
+\label{eq:I-A}
+\end{equation}
+where $\vb{D}=\vb{I}$, since the standard deviations are unknown.
+
+For a linear spline that minimizes \eqref{eq:wahba} for $m=1$, computations similar to \eqref{eq:ojsuka} produce the same formula for $\vb{A}(\lambda)$ with different matrices:
+\begin{equation}
+\begin{aligned}
+&\vb{Q}\text{ is an $ n \times n $ matrix with }  q_{ii}=-1,\:q_{i-1,i} =1,\\
+&\vb{T}\text{ is diagonal with}\:\:t_{ii} = h_i,\\
+&\vb{Tb}=\vb{Q^\top a},\\
+&\vb{Qb}=\lambda(\vb{y}-\vb{a}).
+\end{aligned}
+\label{eq:lineareqs}
+\end{equation}
+However, such a derivation of formulas for $\vb{A}(\lambda)$ becomes exponentially more complicated as the order of the derivative increases. Therefore, higher-degree splines -- namely, quintic and septic, that are important for more extensive numerical experiments, are obtained using the algorithm and the corresponding code described in \cite{hisaps1} and \cite{hisaps2}, which utilize B-splines for computation.
+
+For the linear and cubic spline we also cannot simply insert \eqref{eq:I-A} into the GCV formula and minimize it -- in addition to the obvious inelegance of the result, matrix inverses are notoriously computationally intensive. Therefore, some numerical methods can be applied to produce a more efficient formula. First, we define $\vb{F}=\vb{QT}^{-\frac{1}{2}}$: for a linear spline $\vb{T}^{-\frac{1}{2}}$ is easily derived since $\vb{T}$ is diagonal.  In the case of a cubic spline, apart from being tridiagonal and positive definite (assuming ${h}_i>0$ for all $i$), $\vb{T}$ is also a \textit{Toeplitz} matrix, i.e., constant on each descending diagonal. Such matrices have well-known formulas for eigenvalues and eigenvectors, allowing us to easily diagonalize $\vb{T}=\vb{\Gamma D\Gamma}^\top $ and find its inverse square root as $\vb{\Gamma D}^{-\frac{1}{2}}\vb{\Gamma}^\top $. After obtaining $\vb{F}$, we derive $\vb{I}-\vb{A}$ as a function of $\vb{F}$ by inserting $\vb{Q}=\vb{FT}^{\frac{1}{2}}$ into \eqref{eq:I-A}:
+\begin{equation}
+\vb{I}-\vb{A}(\lambda)=\vb{FT}^{\frac{1}{2}}(\vb{T}^{\frac{1}{2}}\vb{F^\top FT}^{\frac{1}{2}}+\lambda \vb{T}^{\frac{1}{2}}\vb{T}^{\frac{1}{2}})^{-1}\vb{T}^{\frac{1}{2}}\vb{F}^\top =\vb{F(F^\top F+\lambda I)^{-1}F^\top}.
+\label{eq:fs}
+\end{equation}
+This formula still contains an undesirable matrix inverse. To eliminate it, we compute a Singular Value Decomposition(SVD) of $\vb{F}.$
+\begin{definition}[\textit{Singular Value Decomposition}]
+    \textit{The singular values} $\sigma_i$ of a matrix $\vb{A}$ are defined as $\sqrt{\mu_i}$, where $\mu_i$ are eigenvalues of the matrix $\vb{A^\top A}$. SVD is thus the following factorization of a matrix:
+\[
+\vb{A=U\Sigma V^\top} ,
+\]
+where $\vb{U, V}$ -- orthogonal matrices, $\vb{\Sigma}$ -- diagonal matrix of singular values $\sigma_i(\vb{A})$.
+\end{definition}
+\noindent This decomposition exists for any matrix and is available in Python as the \texttt{numpy.linalg.svd} function. Inserting SVD of $F$ into \eqref{eq:fs}, we obtain the following:
+\[\vb{
+I-A(\lambda)=U\Sigma V^\top (V^\top \Sigma^\top \Sigma V+\lambda I)^{-1}V\Sigma^\top U^\top =U\Sigma(\Sigma^\top \Sigma+\lambda I)^{-1}\Sigma^\top U^\top},
+\]
+where
+\begin{equation*}
+\begin{aligned}
+&\vb{(\Sigma^\top\Sigma+\lambda I)^{-1}}=
+\begin{pmatrix}
+\frac{1}{d_1^2+\lambda}&0& \ldots & 0 \\
+0 & \frac{1}{d_2^2+\lambda} & \ldots & \vdots \\
+\vdots & \ddots & \ddots & 0 \\
+0 & \ldots & 0 & \frac{1}{d_{n-2}^2+\lambda}
+\end{pmatrix},
+&\vb{\Sigma\Sigma^\top}=\begin{pmatrix}
+d_1^2&0& \ldots & 0 \\
+0 & d_2^2 & \ldots & \vdots \\
+\vdots & \ddots & \ddots & 0 \\
+0 & \ldots & 0 & d_{n-2}^2
+\end{pmatrix},
+\end{aligned}
+\end{equation*}
+with $d_i$ -- singular values of the matrix $\vb{F}$.
+\noindent $\vb{I-A}$ is therefore given as
+\begin{equation}
+\vb{U}\begin{pmatrix}
+\frac{d_1^2}{d_1^2+\lambda}&0& \ldots & 0 \\
+0 & \frac{d_2^2}{d_2^2+\lambda} & \ldots & \vdots \\
+\vdots & \ddots & \ddots & 0 \\
+0 & \ldots & 0 & \frac{d^2_{n-2}}{d_{n-2}^2+\lambda}
+\end{pmatrix}\vb{U}^\top.
+\end{equation}
+Calculating the norm and trace of $\vb{I-A}$ we arrive at a computationally feasible GCV function:
+\begin{equation*}
+V(\lambda)=\frac{1}{n}\,\frac{\displaystyle \sum_{i=1}^{n-2}\left(\frac{d_i^2}{d_i^2+\lambda}\right)^2 {z}_i^2}{\displaystyle \left[\frac{1}{n}\sum_{i=1}^{n-2}\left(\frac{d_i^2}{d_i^2+\lambda}\right)\right]^2},
+\end{equation*}
+where $\vb{z}=(z_1, \ldots, z_n)^\top=\vb{U^\top y}.$
+The minimizer of such $V(\lambda)$ is then obtained with the help of Python's \texttt{scipy.optimize.minimize\_scalar}, and the equations defining the smoothing splines are computed using \eqref{eq:lineareqs} and \eqref{eq:formulas} for first and third degrees, respectively. The complete algorithm for the cubic spline is thus:
+\begin{algorithm}[H]
+\caption{Cubic smoothing spline computation}
+\begin{algorithmic}[1]
+\State \textbf{Inputs:} Vectors \textbf{t} and \textbf{y} containing raw data 
+\State \textbf{Output:} Vectors \textbf{a}, \textbf{b}, \textbf{c}, \textbf{d} containing the coefficients of the cubic smoothing spline such that $\vb{a}+\vb{b}(t-t_i)+\vb{c}(t-t_i)^2+\vb{d}(t-t_i)^3$
+\Procedure{SmoothingSplineCubic}{$t,y$}
+\State $n \gets$ length of vectors \textbf{t}, \textbf{y}
+\State \textcolor{gray}{\textit{Compute interval lengths}}
+\For{$i = 1$ to $n-1$}
+    \State ${h}_i \gets {t}_{i+1} - {t}_{i}$
+\EndFor
+\State \textcolor{gray}{\textit{Construct tridiagonal matrices $\vb{Q}$ and $\vb{T}$}}
+\For{$i = 1$ to $n-2$}
+    \State ${Q}_{i,i}\gets{1}/{h_i}$
+    \State ${Q}_{i+1,i}\gets-1/{h}_i-1/{h}_{i+1}$
+    \State ${Q}_{i+2,i}\gets{1}/{{h}_{i+1}}$
+    \State ${T}_{i,i}\gets{2({h}_i+{h}_{i+1})}/{3}$
+    \State ${T}_{i,i+1}={T}_{i+1,i}\gets{{h}_{i+1}}/{3}$
+\EndFor
+\State \textcolor{gray}{\textit{Compute $\vb{T}^{-1/2}$}}
+\For{$i = 1$ to $n-2$}
+    \State ${D}_{i,i} \gets \left({T}_{i,i}+2{T}_{i,i+1}\cos(\frac{i\pi}{n+1})\right)^{-1/2}$
+    \For{$j = 1$ to $n-2$}
+        \State ${{\Gamma}}_{i,j}\gets  \sqrt{\frac{2}{n+1}}\sin(\frac{ij\pi}{n+1})$
+    \EndFor
+\EndFor
+\State $\vb{T}^{-1/2}\gets \vb{\Gamma}\vb{D}\vb{\Gamma}^\top$
+\State \textcolor{gray}{\textit{Compute the singular value decomposition}}
+\State $\vb{QT}^{-1/2}=\vb{U}\vb{\Sigma}\vb{V}^\top$
+\State \textcolor{gray}{\textit{Compute generalized cross-validation $V(\lambda)$}}
+\For{$i = 1$ to $n-2$}
+    \State ${{s}_i} \gets \frac{{{\Sigma}^2_{i,i}}}{{{\Sigma}^2_{i,i}}+\lambda }$
+\EndFor
+\State $V(\lambda)\gets \frac{n(\vb{s}\vb{U}^\top \vb{y})^2}{\left(\sum\vb{s}\right)^2}$
+\State $\lambda \gets \arg\min_{\lambda} V(\lambda)$
+\State \textcolor{gray}{\textit{Compute spline coefficients}}
+\State $\vb{c}\gets \text{solve } (\vb{Q}^\top\vb{Q}+\lambda\vb{I})\vb{c}=\lambda\vb{Q}\top\vb{y}$
+\State $\vb{a}\gets\vb{y}-\vb{Qc}/\lambda$
+\State $\vb{c}\gets(0,c_1,\dots,c_{n-2},0)$
+\For{$i = 1$ to $n-1$}
+\State ${d}_i\gets\frac{{c}_{i+1}-{c}_i}{3{h}_i}$
+\State  ${b}_i \gets\frac{{a}_{i+1}-{a}_i}{{h}_i} -{c}_i {h}_i -{d}_i {h}_i^2$
+\EndFor
+\State \Return $(\vb{a},\vb{b},\vb{c},\vb{d})$
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
+\chapter{Experiments on Synthetic Data}
+Although smoothing splines have consistently been shown to be an effective method for smoothing data with additive white Gaussian noise, they are not infallible even under these perfect conditions -- and the noise present in real world data may not be Gaussian, or even white at all. The main problem with smoothing such data is that there is nothing to compare the result with, no way to confirm that the method performed adequately -- the only thing we can do is hope that the noise is white and rely on our knowledge that smoothing splines work well in the majority of such cases. And while we can possibly detect if the method is completely unsuitable for our specific data, being able to choose the spline degree which performed the best by only looking at the smoothed result is practically impossible. For that reason, certain numerical experiments need to be conducted prior to applying the method to the real-life data in order to observe how it performs under various conditions -- different temporal dynamics, non-white noise, etc., and develop a more thorough approach to analyzing the result.
+\section{Synthetic Signals}
+\label{sec:synthsig}
+Naturally, we cannot run the method on every possible signal with every possible noise characteristic to see if it behaves well. We can, however, get a general impression by analyzing it on the five functions presented in Fig. \ref{fig:original plots} with different periodicity, frequency content, etc.
+\begin{figure}[H]
+    \centering
+    \small
+
+    \begin{subfigure}{0.4\textwidth}
+        \centering
+        {\scriptsize $y=\log\left(0.5+(t \bmod 10)\right)$}
+
+        \includegraphics[width=0.9\textwidth,height=0.15\textheight,keepaspectratio]{periodic_log/orig.pdf}
+        \caption{Periodic logarithm}
+    \end{subfigure}
+    \hspace{0.03\textwidth}
+    \begin{subfigure}{0.43\textwidth}
+        \centering
+        {\scriptsize $y=\sin\left(\frac{2\pi t}{10}\right)+0.3\sin\left(\frac{2\pi t}{0.8}\right)$}
+
+        \includegraphics[width=0.9\textwidth,height=0.15\textheight,keepaspectratio]{slow_fast/orig.pdf}
+        \caption{Slow-fast}
+    \end{subfigure}
+
+    \vspace{-0.5em}
+\end{figure}
+
+\begin{figure}[H]\ContinuedFloat
+    \centering
+    \small
+    \begin{subfigure}{0.43\textwidth}
+        \centering
+        
+        {\scriptsize $y=\sin\left(2\pi\left[0.1t+
+        \frac{0.95}{t_{\max}-t_{\min}}t^2\right]\right)$}
+        
+        \includegraphics[width=0.9\textwidth,height=0.17\textheight,keepaspectratio]{chirp/orig.pdf}
+    \caption{Chirp}
+    \end{subfigure}
+    \hspace{0.04\textwidth}
+    \begin{subfigure}{0.4\textwidth}
+        \centering
+    
+        {\scriptsize $y = 1.2e^{-t/5} + 0.5e^{-t/10}\sin(\pi t)$}
+        
+        \includegraphics[width=0.9\textwidth,height=0.17\textheight,keepaspectratio]{transient/orig.pdf}
+    \caption{Transient}
+    \end{subfigure}
+
+    \vspace{0.2em}
+
+    \begin{subfigure}{0.43\textwidth}
+        \centering
+        {\scriptsize $y = 0.05t 
+        + \frac{1}{2}\left(1+\tanh\left(\frac{t-8}{0.25}\right)\right)
+        + 0.15\sin\left(\frac{2\pi t}{6}\right)$}
+        
+        \includegraphics[width=0.9\textwidth,height=0.17\textheight,keepaspectratio]{event/orig.pdf}
+        \caption{Event}
+    \end{subfigure}
+\caption{Clean synthetic signals}
+\label{fig:original plots}
+
+\end{figure}
+\noindent All functions are normalized to have the maximum value of 1, to ensure that the noise amplitude affects them equally. The chosen standard deviation of the noise is $\sigma=0.25$, and an identical noise sequence is applied to each signal.
+\begin{enumerate}[label=\alph*)]
+\item \textbf{Periodic logarithm} function represents a very smooth, gradually increasing process with a sharp drop, that repeats after a long period. This could represent, for example, a pressure build up in a compressor tank with a sudden release.
+\item \textbf{Slow-fast} function describes a signal with multiple dominating frequencies. An example of such dynamic occurring naturally is a dataset that contains outside temperatures measured multiple times a day over several years, as temperatures vary over both a year and a 24-hour period. 
+\item \textbf{Chirp} function describes a signal with non-stationary frequency -- in our case it starts oscillating more rapidly with time.
+\item \textbf{Transient} signals usually describe a sudden, aperiodic process that changes rapidly for a short period before settling into a steady behavior. Our function aims to emulate this with a high-frequency signal with gradually decreasing amplitude.
+\item \textbf{Event} function represents a process in which a sharp shift occurs -- for example, a flow of water after a valve is opened.
+\end{enumerate}
+
+For the experiments to resemble real-life conditions, apart from the white Gaussian noise assumed in the method, the functions were also perturbed by non-Gaussian white, brown, heteroscedastic (with non-constant variance), and correlated noise processes. To simulate its definition as the integral of a white noise signal, brown noise is computed as a normalized cumulative sum of a white noise vector.
+\section{Statistical Metrics}
+\label{sec:statmet}
+Although the behavior of the method on synthetic signals can be analyzed visually, as we can simply compare the results with the "true" function and conclude if the smoothing is successful, real-life data do not allow for such a straightforward approach. Therefore, more sophisticated methods of investigation are required.
+\begin{itemize}
+    \item \textbf{Power Spectral Density (PSD)} measures the power of the signal at different frequencies using Welch's method, which is available as a part of the standard \texttt{scipy} package in Python. An advantage of Welch's PSD over other methods, such as a simple periodogram, is that it reduces the variance of the signal by sacrificing the frequency resolution -- we can control the amount of "smoothing" using the parameter \texttt{nperseg} (number of samples per segment) -- the higher it is, the higher the frequency resolution will be. This allows us to separate the meaningful frequencies from the noise more easily. However, if the function is expected to have small oscillations or need higher resolution for another reason, a simple periodogram may be a better option. PSD plots can be very illustrative both for the smoothed signals and the residuals from smoothing.
+    \item \textbf{Auto Correlation Function (ACF)} determines the correlation between
+a time series and its lagged version, that is, how similar they are at different time lags. By
+plotting the ACF of the raw signal, we can obtain valuable information about its temporal trends: repeating
+spikes may indicate the presence of cyclic patterns, while a gradual decline -- a long-term trend. For smoothing residuals, ACF plots help identify the presence of autocorrelation, which may indicate oversmoothing. We also plot a $95\%$ confidence interval, which determines the acceptable function values -- if they all lie within it, there is no autocorrelation present, if a value lies outside the bounds, we can consider the function to have statistically significant autocorrelation at the respective lag.
+    
+    \item \textbf{Frequency cutoff percentage plot} allows us to observe which percentage of power of each frequency was removed by smoothing to spot, for example, if the method retained anomalously many high frequencies. For some frequency $j$ cutoff percentage is calculated as \[100\%\times \frac{{p}_{orig}^{(j)}-{p}_{smooth}^{(j)}}{{p}_{orig}^{(j)}},\] 
+    where ${p}_{orig}^{(j)}, {p}_{smooth}^{(j)}$ are the powers of frequency $j$ in the noisy and smoothed signals, respectively. Cutoff percentage plots are particularly useful because they allow us to compare the smoothing results in relation to each other, rather than in absolute terms. A seemingly large gap between different spline degrees on a residuals PSD plot may turn out to be rather insignificant in actuality. In addition, although rarely, the method of smoothing splines is capable of producing frequencies that were not originally present in the data. A negative result on a cutoff percentage plot is an indicator of that.
+    \item \textbf{Standard deviation} of the noise can be estimated from the residual and compared with the assumed one, or, if the data are completely opaque, to the standard deviation obtained by some other smoothing method. It helps to detect a possible over/undersmoothing produced by the method. 
+    \item \textbf{Durbin-Watson} statistic is used to detect autocorrelation in a dataset. It is equal to
+    \[d=\frac{\sum_{i=1}^{n}\left(r_{t_i}-r_{t_{i-1}}\right)^{2}}{\sum_{i=0}^{n} r_{t_i}^{2}},\] where $r_{t_i}$ -- the value of the data point at time $t_i$.
+\noindent The range of $d$ is approximately 0 to 4, where 
+\begin{itemize}
+\item $d\approx2\Rightarrow$ no autocorrelation,
+\item $d>2\Rightarrow$ possible positive autocorrelation,
+\item $d<2\Rightarrow$ possible negative autocorrelation.
+\end{itemize}
+The obtained value can then be checked against the Durbin-Watson critical value bounds to determine if we can reject the null hypothesis that the residual is independent, or simply compared to the results for different spline degrees to suggest the best-fitting one.
+\end{itemize}
+\section{Results on synthetic data}
+We begin by analyzing the original noisy data. All signals below are polluted by white Gaussian noise with the selected SD $\sigma=0.25.$
+\subsubsection{Periodic logarithm}
+We first analyze the raw periodic logarithm signal -- despite the relatively large noise, its periodicity is immediately visible from the ACF function plot in Figure \ref{perlogfuncacf}. The spike at approximately lag $100$, which, given the sampling frequency $f_s=10$ is equal to around 10 seconds, is indicative of the $10$ second period clearly visible also on the "true" function in Figure \ref{perlogfuncpsd}. Such low-frequency functions tend to get slightly undersmoothed, which is apparent from Figure \ref{perlogfuncsr}. Unfortunately, undersmoothing is quite complicated to detect, as even Table \ref{tab:smperlog} shows that the standard deviations of the residuals, although slightly below, are still quite close to the selected one. Unless one knows the true function or have a very precise estimate of the true standard deviation, there is virtually no way to identify undersmoothing. However, Figures \ref{perlogfuncpsd},d,e suggest the best option in this non-ideal situation -- since noise typically consists of very high frequencies, it is preferable for the smoothing to remove as much of these as possible (there are, of course, exceptions to this rule discussed later). And vise versa, conserving low frequencies is essential as that is where most of the true dynamic usually lies. Therefore, the most accurate choice here is most likely the $7^{th}$ degree smoothing spline, as it satisfies both recommendations. This assumption also complies with the Durbin-Watson statistic: the residual from the septic spline produces a measurement closest to the desired $2.$ 
+
+It is thus recommended to use the septic spline for the periodic logarithm signal. In addition, it may be of interest to apply the method separately over each period and observe how this affects the final result.
+\begin{figure}[H]
+\centering
+
+% --- Row 1 ---
+\begin{subfigure}[t]{0.32\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{pics/periodic_log/smoothraw.pdf}
+    \caption{Smoothed versus noisy functions}
+    \label{perlogfuncsr}
+\end{subfigure}
+\hfill
+\begin{subfigure}[t]{0.32\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{pics/periodic_log/funcpsd.pdf}
+    \caption{PSD of smoothed versus noisy functions}
+    \label{perlogfuncpsd}
+\end{subfigure}
+\hfill
+\begin{subfigure}[t]{0.32\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{pics/periodic_log/funcacf.pdf}
+    \caption{ACF of the noisy function}
+    \label{perlogfuncacf}
+\end{subfigure}
+
+\vspace{0.5em}
+
+% --- Row 2 ---
+\begin{subfigure}[t]{0.32\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{periodic_log/residpsd.pdf}
+    \caption{PSD of the residual}
+    \label{perlogresidpsd}
+\end{subfigure}
+\hfill
+\begin{subfigure}[t]{0.32\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{periodic_log/cutoff.pdf}
+    \caption{Frequency power cutoff percentage }
+    \label{perlogcutoff}
+\end{subfigure}
+\hfill
+\begin{subfigure}[t]{0.32\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{pics/periodic_log/residacf.pdf}
+    \caption{ACF of the residual}
+    \label{perlogresidacf}
+\end{subfigure}
+\caption{Results of the statistical analysis for the noised periodic logarithm signal from \ref{sec:synthsig}}
+\label{fig:6perlog}
+\end{figure}
+\begin{table}[H]
+\centering
+\caption{Statistical metrics for the periodic logarithm signal}
+\input{pics/periodic_log/periodic_log_residual_stats}
+\label{tab:smperlog}
+\end{table}
+\subsubsection{Slow-fast}
+The two-frequency structure of the slow-fast function is evident from Figure \ref{fig:6pslowfast}b -- the raw signal has two distinct peaks, one at a lower frequency, and another at a higher one. The complete elimination of the second peak by the $5^{th}$ and $7^{th}$ degree splines is an stark indicator of oversmoothing, and the ACF plot of the residual on figure \ref{fig:6pslowfast}f confirms that -- the function values for these splines fall far outside the confidence interval, indicating a presence of a significant autocorrelation. The assumption of oversmoothing is also verified by figure \ref{fig:6pslowfast}d, which demonstrates that the method filtered out a substantial amount of lower frequencies -- something we almost never want to see. It is thus rational to refrain from using the quintic and septic splines for this problem, and pick the best out of the other two degrees left -- the cubic spline. Although Table \ref{tab:smpslowfast} suggests that both the linear and cubic splines undersmoothed the data, the former resulted in a more accurate standard deviation. The table also shows how the Durbin-Watson statistic may have a detrimental effect on our analysis: the metrics for the quintic and septic splines are relatively better than those for linear and cubic ones, although we know that this implication is incorrect. Therefore, all statistical tests should be analyzed together and the conclusion should not be based solely on one of them.
+
+Thus, if there is such a marked difference between the non-linear splines, it is most often recommended to choose the highest degree that does not deviate excessively from the raw signal, even if it may produce a slight undersmoothing.
+\begin{figure}[H]
+\centering
+
+% --- Row 1 ---
+\begin{subfigure}[t]{0.32\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{pics/slow_fast/smoothraw.pdf}
+    \caption{Smoothed versus noisy functions}
+\end{subfigure}
+\hfill
+\begin{subfigure}[t]{0.32\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{pics/slow_fast/funcpsd.pdf}
+    \caption{PSD of smoothed versus noisy functions}
+\end{subfigure}
+\hfill
+\begin{subfigure}[t]{0.32\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{pics/slow_fast/funcacf.pdf}
+    \caption{ACF of the noisy function}
+\end{subfigure}
+\end{figure}
+\begin{figure}[H]\ContinuedFloat
+\centering
+% --- Row 2 ---
+\begin{subfigure}[t]{0.32\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{slow_fast/residpsd.pdf}
+    \caption{PSD of the residual}
+\end{subfigure}
+\hfill
+\begin{subfigure}[t]{0.32\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{slow_fast/cutoff.pdf}
+    \caption{Frequency power cutoff percentage }
+\end{subfigure}
+\hfill
+\begin{subfigure}[t]{0.32\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{pics/slow_fast/residacf.pdf}
+    \caption{ACF of the residual}
+\end{subfigure}
+
+\caption{Results of the statistical analysis for the noised slow-fast signal from \ref{sec:synthsig}}
+\label{fig:6pslowfast}
+\end{figure}
+\begin{table}[H]
+\centering
+\caption{Statistical metrics for the slow-fast signal}
+\input{pics/slow_fast/slow_fast_residual_stats}
+\label{tab:smpslowfast}
+\end{table}
+\subsubsection{Chrirp}
+We can observe the varying frequency of the chirp signal in Figure \ref{fig:6chirp}b, where the PSD plot has a continuous "mass" of frequencies, rather than two isolated peaks as in the slow-fast signal. The ACF plot in Figure \ref{fig:6chirp}c is also notable as, although we clearly know that the signal is not a random process and that the data is correlated, it seems to suggest otherwise. Our signal may not provide the most illustrative example due to the relatively low sampling frequency, but in principle the ACF plot for such a signal typically shows low-amplitude but rapid oscillations that gradually dampen. This behavior is expected, as the values of the autocorrelation function are calculated by comparing the signal with its lagged version, and the higher the lag -- the more different is the frequency of the signal. Thus, such a flat ACF plot may be a reason to suspect a non-constant frequency. The Figure \ref{fig:6chirp}b also that increasing the degree of spline leads to a stronger filtering of higher frequencies, but the extent of it is only evident in Figures \ref{fig:6chirp}d, e -- the linear spline removed nearly nothing, and the $0$ standard deviation in Table \ref{tab:smchirp} estimated from its residual is another proof of this. The $7^{th}$ degree spline, on the other hand, was the most effective at removing higher frequencies while preserving lower ones, making it the most suitable candidate for this dataset. However, it is evident in both Figure \ref{fig:6chirp}a and Table \ref{tab:smchirp} that despite performing the best, septic spline also resulted in significant undersmoothing -- this, however, appears to be largely caused by the presence of very high frequencies, rather than their non-constancy.
+
+If the smoothing splines method is applied to this signal, the $7^{th}$ degree spline produces the best possible result; however, alternative smoothing approaches may also be considered to assess whether they provide a more accurate standard deviation estimate.
+\begin{figure}[H]
+\centering
+
+% --- Row 1 ---
+\begin{subfigure}[t]{0.32\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{pics/chirp/smoothraw.pdf}
+    \caption{Smoothed versus noisy functions}
+\end{subfigure}
+\hfill
+\begin{subfigure}[t]{0.32\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{pics/chirp/funcpsd.pdf}
+    \caption{PSD of smoothed versus noisy functions}
+\end{subfigure}
+\hfill
+\begin{subfigure}[t]{0.32\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{pics/chirp/funcacf.pdf}
+    \caption{ACF of the noisy function}
+\end{subfigure}
+\end{figure}
+\begin{figure}[H]\ContinuedFloat
+\centering
+
+% --- Row 2 ---
+\begin{subfigure}[t]{0.32\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{chirp/residpsd.pdf}
+    \caption{PSD of the residual}
+\end{subfigure}
+\hfill
+\begin{subfigure}[t]{0.32\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{chirp/cutoff.pdf}
+    \caption{Frequency power cutoff percentage }
+\end{subfigure}
+\hfill
+\begin{subfigure}[t]{0.32\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{pics/chirp/residacf.pdf}
+    \caption{ACF of the residual}
+\end{subfigure}
+
+\caption{Results of the statistical analysis for the noised chirp signal from \ref{sec:synthsig}}
+\label{fig:6chirp}
+\end{figure}
+\begin{table}[H]
+\centering
+\caption{Statistical metrics for the chirp signal}
+\input{pics/chirp/chirp_residual_stats}
+\label{tab:smchirp}
+\end{table}
+\subsubsection{Transient}
+The transient signal in Figure \ref{fig:6transient} is rather complicated to analyze: the ACF plot in Figure \ref{fig:6transient}c is not incredibly illustrative, and the PSD plot in Figure \ref{fig:6transient}b indicates that the power of the noise frequencies is comparable to that of the underlying function, which may suggest that smoothing will be problematic. The fast amplitude decrease combined with the the relatively high frequency further support this assumption, as the latter has consistently shown to be troublesome to smooth, and the former makes the signal more affected by the noise amplitude. Our concerns are confirmed by Figure \ref{fig:6transient}a, where the smoothed signal deviates quite significantly from the true function. This issue is virtually impossible to detect without direct comparison, as the standard deviation results in Table \ref{tab:smtransient} suggest that the smoothing is very successful, and the ACF values for the residual stay firmly within the confidence bounds for all degrees as well. Thus, it is simply advised to be more careful when the power of the high frequencies is comparable to the lower ones. Nevertheless, Figures \ref{fig:6transient}d,e show that all nonlinear smoothing splines, especially quintic and septic, which are virtually identical, produce comparable results.
+
+Therefore, it is rational to choose the cubic spline for this dataset to avoid increased computational costs. As with the chirp signal, it is also recommended to seek other smoothing methods for comparison.
+
+\begin{figure}[H]
+\centering
+
+% --- Row 1 ---
+\begin{subfigure}[t]{0.32\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{pics/transient/smoothraw.pdf}
+    \caption{Smoothed versus noisy functions}
+\end{subfigure}
+\hfill
+\begin{subfigure}[t]{0.32\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{pics/transient/funcpsd.pdf}
+    \caption{PSD of smoothed versus noisy functions}
+\end{subfigure}
+\hfill
+\begin{subfigure}[t]{0.32\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{pics/transient/funcacf.pdf}
+    \caption{ACF of the noisy function}
+\end{subfigure}
+
+\vspace{0.5em}
+
+% --- Row 2 ---
+\begin{subfigure}[t]{0.32\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{transient/residpsd.pdf}
+    \caption{PSD of the residual}
+\end{subfigure}
+\hfill
+\begin{subfigure}[t]{0.32\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{transient/cutoff.pdf}
+    \caption{Frequency power cutoff percentage }
+\end{subfigure}
+\hfill
+\begin{subfigure}[t]{0.32\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{pics/transient/residacf.pdf}
+    \caption{ACF of the residual}
+\end{subfigure}
+\caption{Results of the statistical analysis for the noised transient signal from \ref{sec:synthsig}}
+\label{fig:6transient}
+\end{figure}
+
+\begin{table}[H]
+\centering
+\caption{Statistical metrics for the transient signal}
+\input{pics/transient/transient_residual_stats}
+\label{tab:smtransient}
+\end{table}
+\subsubsection{Event}
+The occasional redundancy of higher degree splines is further highlighted by the event signal in Figure \ref{fig:6event}. Not only are quintic and septic splines virtually identical to the cubic one, they also introduced additional lower frequencies, as evident from the negative values in the cutoff plot in Figure \ref{fig:6event}e. Also, similarly to the transient signal, the magnitude of the noise results in deviated smoothing, despite all the metrics indicating that it is very accurate. Thus, the same recommendations as for the transient signal are applicable in this case as well.
+\begin{figure}[H]
+\centering
+
+% --- Row 1 ---
+\begin{subfigure}[t]{0.32\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{pics/event/smoothraw.pdf}
+    \caption{Smoothed versus noisy functions}
+\end{subfigure}
+\hfill
+\begin{subfigure}[t]{0.32\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{pics/event/funcpsd.pdf}
+    \caption{PSD of smoothed versus noisy functions}
+\end{subfigure}
+\hfill
+\begin{subfigure}[t]{0.32\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{pics/event/funcacf.pdf}
+    \caption{ACF of the noisy function}
+\end{subfigure}
+
+\vspace{0.5em}
+
+% --- Row 2 ---
+\begin{subfigure}[t]{0.32\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{event/residpsd.pdf}
+    \caption{PSD of the residual}
+\end{subfigure}
+\hfill
+\begin{subfigure}[t]{0.32\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{event/cutoff.pdf}
+    \caption{Frequency power cutoff percentage }
+\end{subfigure}
+\hfill
+\begin{subfigure}[t]{0.32\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{pics/event/residacf.pdf}
+    \caption{ACF of the residual}
+\end{subfigure}
+
+\caption{Results of the statistical analysis for the noised event signal from \ref{sec:synthsig}}
+\label{fig:6event}
+\end{figure}
+\begin{table}[H]
+\centering
+\caption{Statistical metrics for the event signal}
+\input{pics/event/event_residual_stats}
+\label{tab:smevent}
+\end{table}
+\section{Limitations}
+As demonstrated by the previous section, even for the conditions satisfying the theoretical basis of smoothing splines (white Gaussian noise), they are still prone to occasional suboptimal results. Perhaps the one most frequently observed during the experiments on synthetic data is undersmoothing, occurring in both very smooth, low-frequency functions like the periodic logarithm and rapidly oscillating ones like the chirp signal. Not even the undersmoothing itself poses the biggest problem, more so the fact that it is notably difficult to detect, unless there is a good estimate for the standard deviation of the noise. However, while unfortunate, undersmoothing presents a smaller risk to the further usage of the data than oversmoothing, as although it preserves some of the noise, it does not remove important underlying dynamics either. Fortunately, oversmoothing is most often easily detectable by, for example, the ACF plot of the residual.
+
+Another issue illustrated by the numerical experiments is the method producing, according to all statistical metrics, a very accurate smoothing, despite significantly deviating from the true function in actuality. This happens predominantly when the magnitude of low frequencies from the underlying signal is comparable to the magnitude of high frequencies caused by the noise. Thus, in these circumstances, it is recommended to apply some other smoothing methods for result comparison; or, if the aim of smoothing is purely to obtain the SD estimate of the noise, it may be advisable to simply seek some other data (measured at a different period, etc.).
+
+As mentioned, the theory of smoothing splines is largely based on the fact that the noise in the data is white, which is rarely true in a real-life situation. Hence, it is of interest to test how the method behaves on non-white noise. Smoothing splines were applied to data with added brown, correlated (non-independent), and heteroscedastic noise and produced satisfactory results in most cases examined. However, there were still some notable outliers. In Figure \ref{fig:6errevent} the event function is polluted by correlated noise and applying the method to this signal results in significant undersmoothing, again not easily detectable by all statistical metrics except the standard deviation in Table \ref{tab:smerrevent}. Even then, the estimated SD value of the septic spline is quite misleading, as it certainly does not reflect the extent of undersmoothing. 
+\begin{figure}[H]
+\centering
+
+% --- Row 1 ---
+\begin{subfigure}[t]{0.32\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{pics/event/errorsmoothraw.pdf}
+    \caption{Smoothed versus noisy functions}
+\end{subfigure}
+\hfill
+\begin{subfigure}[t]{0.32\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{pics/event/errorfuncpsd.pdf}
+    \caption{PSD of smoothed versus noisy functions}
+\end{subfigure}
+\hfill
+\begin{subfigure}[t]{0.32\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{pics/event/errorfuncacf.pdf}
+    \caption{ACF of the noisy function}
+\end{subfigure}
+
+\vspace{0.5em}
+
+% --- Row 2 ---
+\begin{subfigure}[t]{0.32\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{pics/event/errorresidpsd.pdf}
+    \caption{PSD of the residual}
+\end{subfigure}
+\hfill
+\begin{subfigure}[t]{0.32\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{pics/event/event_cutoff.pdf}
+    \caption{Frequency power cutoff percentage }
+\end{subfigure}
+\hfill
+\begin{subfigure}[t]{0.32\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{pics/event/errorresidacf.pdf}
+    \caption{ACF of the residual}
+\end{subfigure}
+
+\caption{Results of the statistical analysis for the slow-fast signal from \ref{sec:synthsig} with brown noise}
+\label{fig:6errevent}
+\end{figure}
+\begin{table}[H]
+\centering
+\caption{Statistical metrics for the event signal}
+\input{pics/event/errortable}
+\label{tab:smerrevent}
+\end{table}
+Figure \ref{fig:6errslowfast} shows the "Slow-fast" function with added brown noise and the notorious method fault -- the obtained result seems quite plausible, and if there were no true function available to compare with, we would probably assume it to be accurate. However, by contrast to previous examples of this issue, the statistical metrics in this case immediately warn us that a significant error occurred -- the ACF of the residual, estimated SD, and Durbin-Watson values fall far out of their respective acceptable ranges. Therefore, we can conclude with confidence that the method of smoothing splines produced a flawed result and is not recommended for use for this dataset.
+\begin{figure}[H]
+\centering
+
+% --- Row 1 ---
+\begin{subfigure}[t]{0.32\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{pics/slow_fast/errorsmoothra.pdf}
+    \caption{Smoothed versus noisy functions}
+\end{subfigure}
+\hfill
+\begin{subfigure}[t]{0.32\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{pics/slow_fast/errorfuncpsd.pdf}
+    \caption{PSD of smoothed versus noisy functions}
+\end{subfigure}
+\hfill
+\begin{subfigure}[t]{0.32\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{pics/slow_fast/errorfuncacf.pdf}
+    \caption{ACF of the noisy function}
+\end{subfigure}
+
+\vspace{0.5em}
+
+% --- Row 2 ---
+\begin{subfigure}[t]{0.32\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{pics/slow_fast/errorresidpsd.pdf}
+    \caption{PSD of the residual}
+\end{subfigure}
+\hfill
+\begin{subfigure}[t]{0.32\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{pics/slow_fast/errorcutoff.pdf}
+    \caption{Frequency power cutoff percentage }
+\end{subfigure}
+\hfill
+\begin{subfigure}[t]{0.32\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{pics/slow_fast/errorresidacf.pdf}
+    \caption{ACF of the residual}
+\end{subfigure}
+
+\caption{Results of the statistical analysis for the event signal from \ref{sec:synthsig} with correlated noise}
+\label{fig:6errslowfast}
+\end{figure}
+\begin{table}[H]
+\centering
+\caption{Statistical metrics for the event signal}
+\input{pics/slow_fast/errortable}
+\label{tab:smerrslowfast}
+\end{table}
+As evident, the main limitation of the smoothing spline method is not that it may produce some erroneous results, but that these errors are sometimes rather difficult or entirely impossible to detect. However, the latter cases occurred mostly in extreme situations that were used to stress-test the method and should not discourage one from using it.
+\section{General recommendations}
+The numerical experiments described in the previous section allow us to form some guidelines for the application of the smoothing splines method. Of course, the dynamics of real-life signals can rarely be described as simply and succinctly as synthetically generated ones, and it is unjustified to state that these guidelines are true for every possible real-life situation. Therefore, they should be viewed as a set of warnings and suggestions, rather than a strict "if-then" directive. It is also important to note that while the statistical metrics described in the previous section provide a thorough analysis of the signal and the results of its smoothing, some knowledge of the system examined is essential to be able to accurately assess and interpret the obtained information.
+
+The periodic logarithm signal in Figure \ref{fig:6perlog} is a good representation of a slowly-varying, non-oscillatory signal, and, as we have observed, they tend to get moderately undersmoothed. Since detecting this is challenging and often impossible by simply looking at the statistical metrics, good knowledge about the system is crucial -- having a good assumption of the standard deviation is the most reliable way to confirm it. Intuitively, if the computed standard deviation is greater than the theoretical one -- oversmoothing occurred; if the opposite is true, the spline likely undersmoothed the data. As a general rule, if the signal is expected to have the dynamic described above, some undersmoothing is often present. The spline of degree $7$ usually produces the most accurate result in such a case, but the optimality of its use should be verified with power spectrum plots -- unless there is a notable difference from other degrees, quintic or even cubic splines will often suffice.
+
+An opposite problem of oversmoothing occurs often when higher degree splines are used on signals with multiple dominating frequencies, such as the slow-fast signal. In this case, the highest of these frequencies is often removed. Fortunately, this issue is often very straightforward to identify -- although the ACF plot of the residual is not helpful in the case of undersmoothing, since by removing almost nothing from the data we also do not remove any underlying pattern, it is a very informative tool when oversmoothing occurs. Another sign of oversmoothing is a pronounced difference between spline degrees as in Figure \ref{fig:6pslowfast}b. In this situation, the smoothing spline of highest degree among the "non-oversmoothing" ones is usually the optimal choice.
+
+We have shown that low-frequency signals can get undersmoothed, but this is also true for high frequency ones, as can be seen for the chirp signal. Although initially its purpose was to show how the method behaved on signals with changing variance, it is also a signal with a large volume of high frequencies, and, by our observations, the undersmoothing in Figure \ref{fig:6chirp}a was caused by them, rather than by their varying. Thus, when applying the method to signals on both ends of the frequency spectrum, one should be cautious about undersmoothing. The ways to detect it have already been described.
+
+A separate comment needs to be made on the Durbin-Watson statistic -- it proves useful in a few specific situations, and should almost never be a decisive factor in the analysis. For example, although a value that deviates significantly from 2 (as in Table \ref{tab:smerrslowfast}) can be indicative of problematic smoothing, it may also occur sporadically for certain functions (as with the chirp function in Table \ref{tab:smchirp}). In the former case, the implication that the method should not be used is completely justified, while in the latter just a slight undersmoothing occurred. It is also not the optimal way to detect autocorrelation, as a simple visual inspection of the ACF plot of the residual usually provides much clearer results. It may, however, be occasionally used to identify the most accurate standard deviation -- when we have similar SD values for all spline degrees, the one corresponding to the Durbin-Watson statistic closest to 2 is usually the most accurate one. Despite its rather narrow usage, it is still worth keeping the Durbin-Watson statistic in our set of tests because, in combination with other metrics, it is quite successful at detecting some extreme faults.
+
+In general, the safest option in the majority of cases is the cubic spline -- it does not normally oversmooth, nor does it undersmooth significantly more than other degrees. Therefore, if a good enough result without any additional analysis is wanted, the cubic spline is the recommended choice. For the best possible result, the guidelines are given above. 
+\chapter{Tests on Real Data}
+Having understood the general ways of analyzing the results of the smoothing splines method, we can proceed with the final stage of the project -- applying it to the real data provided by Carrier.
+\section{Datasets}
+The datasets provided by Carrier are taken from a chiller system and contain information about temperature, pressure, speed, etc. of its respective parts at various times. A very rudimentary scheme of the system is presented in Figure \ref{fig:chiller} to establish a general context for the analyzed datasets. The letters E and C on the scheme represent an evaporator and a condenser, respectively. What exactly these parts of the chiller do is beyond the scope of this thesis, but very naively the chiller system's working process can be described as such: the solid arrows on the scheme represent a flow of water -- warm water leaves the IT room, gets cooled by the chiller, and returns to the IT room through the chilled water pumps. The warm water gets cooled by transferring its heat to the "cooling" water in the chiller, which then does its own separate loop through cooling water pumps and cooling towers to reduce temperature before returning to the chiller. 
+\begin{figure}[hbtp]
+    \centering
+    \includegraphics[width=0.7\textwidth]{pics/ojsuka.png}
+    \caption{Scheme of the chiller system}
+    \label{fig:chiller}
+\end{figure}
+The amount of data obtainable from one chiller system is substantial, both in terms of volume and number of different measurements, therefore, showing it all is redundant -- only a few datasets with varying amplitudes, periodicity, etc. will be examined. The grid in the datasets is not completely uniform, making the use of GCV to find the optimal parameter $\lambda$ very fitting, but it does not contain large gaps or very dense areas. Before applying the algorithm, the datasets are cleaned using standard methods from Python's \texttt{pandas} library: all the \texttt{nan} values are removed, and only data segments representing an active process are considered. For proprietary reasons, standard deviation estimates are normalized against an undisclosed reference value.
+\section{Results}
+\subsubsection{Evaporator pressure}
+Naturally, we cannot expect real-life data to provide smoothing results as well-behaved as we obtain from smoothing synthetic signals generated specifically to work well with our method. However, applying the method to the first dataset -- pressure measurements taken from the evaporator, shown in Figure \ref{fig:evaporator_pressure_smoothraw.pdf} results in a nearly ideal demonstration of it. In Figure \ref{fig:evaporator_pressure_smoothraw.pdf}a we can observe that a substantial amount of sharp spikes -- common characteristics of noise -- were cut off for all degrees, producing a much more interpretable and smooth graph. Although several values outside the $95\%$ confidence bounds on the residual ACF plot in Figure \ref{fig:evaporator_pressure_smoothraw.pdf}f signal that a slight autocorrelation present, it is minimal and can be disregarded. The Durbin-Watson statistics in Table \ref{tab:evappress}, which are very close to the reference value of 2, also support this conclusion. According to the ACF plot, the autocorrelation is mostly located in the beginning of the dataset and could be caused by the heavily smoothed region there -- a possible way to avoid this would be to clean the data before smoothing to get rid of the outliers. The PSD plots in Figures \ref{fig:evaporator_pressure_smoothraw.pdf}b,d,e indicate that, while all splines apart from the linear performed well and removed a comparable amount of high-frequencies, the $7^{th}$ degree spline also retained the most low frequencies, suggesting that it is most likely the optimal choice for this dataset. Although the standard deviation values in Table \ref{tab:evappress} show that the quintic spline resulted in the highest SD estimation, the slight oversmoothing indicated by the ACF values implies that this might be undesired, further confirming the choice of the septic spline.
+% \begin{figure}[H]
+% \centering
+
+% % --- Row 1 ---
+% \begin{subfigure}[t]{0.32\textwidth}
+%     \centering
+%     \includegraphics[width=\textwidth]{1sr.pdf}
+%     \caption{Smoothed versus noisy functions}
+% \end{subfigure}
+% \hfill
+% \begin{subfigure}[t]{0.32\textwidth}
+%     \centering
+%     \includegraphics[width=\textwidth]{1fpsd.pdf}
+%     \caption{PSD of smoothed versus noisy functions}
+% \end{subfigure}
+% \hfill
+% \begin{subfigure}[t]{0.32\textwidth}
+%     \centering
+%     \includegraphics[width=\textwidth]{1facf.pdf}
+%     \caption{ACF of the noisy function}
+% \end{subfigure}
+
+% \vspace{0.5em}
+
+% % --- Row 2 ---
+% \begin{subfigure}[t]{0.32\textwidth}
+%     \centering
+%     \includegraphics[width=\textwidth]{1rpsd.pdf}
+%     \caption{PSD of the residual}
+% \end{subfigure}
+% \hfill
+% \begin{subfigure}[t]{0.32\textwidth}
+%     \centering
+%     \includegraphics[width=\textwidth]{1cutoff.pdf}
+%     \caption{Frequency power cutoff percentage }
+% \end{subfigure}
+% \hfill
+% \begin{subfigure}[t]{0.32\textwidth}
+%     \centering
+%     \includegraphics[width=\textwidth]{1racf.pdf}
+%     \caption{ACF of the residual}
+% \end{subfigure}
+
+% \caption{Results of the statistical analysis for the evaporator pressure signal}
+% \label{fig:evaporator_pressure_smoothraw.pdf}
+% \end{figure}
+% \begin{table}[H]
+% \centering
+% \caption{Statistical metrics for the evaporator pressure signal}
+% \input{1tab}
+% \label{tab:evappress}
+% \end{table}
+% \subsubsection{Evaporator temperature}
+% The temperature signals taken from the evaporator yield another noteworthy result. We receive several temperature measurements from the evaporator, one of which can also be computed from two others, but due to the noise present in the data, the original signal and the one obtained numerically do not fully coincide. Therefore, theoretically, if our smoothing method works, the signals will become more consistent with each other. Looking at the results of the smoothing separately in Figures \ref{fig:evaptemp0.pdf},\ref{fig:evaptemp1.pdf}, and \ref{fig:evaptemp2.pdf} we can see that the linear spline removed virtually nothing for all three signals. While results from the other degrees are comparable, by all the statistical metrics the septic spline slightly outperforms the cubic and quintic ones. However, the main advantage of these datasets is that we have a convenient numerical value to assess the performance of smoothing splines on them -- the RMSE between the original signal and the calculated one, shown in relation to this error between the raw signals in Table \ref{tab:evaptemp}. Interestingly, while the cubic and quintic spline both decreased the error by almost $30\%$, the $7^{th}$ spline performed notably worse, despite the other metrics indicating the opposite. Of course, RMSE is not a perfect, infallible tool, but this result makes choosing the septic spline unjustified, given that its advantage over the other degrees is modest. Thus, the quintic spline is the optimal choice for this dataset.
+% \begin{figure}[H]
+% \centering
+
+% % --- Row 1 ---
+% \begin{subfigure}[t]{0.32\textwidth}
+%     \centering
+%     \includegraphics[width=\textwidth]{21sr.pdf}
+%     \caption{Smoothed versus noisy functions}
+% \end{subfigure}
+% \hfill
+% \begin{subfigure}[t]{0.32\textwidth}
+%     \centering
+%     \includegraphics[width=\textwidth]{21fpsd.pdf}
+%     \caption{PSD of smoothed versus noisy functions}
+% \end{subfigure}
+% \hfill
+% \begin{subfigure}[t]{0.32\textwidth}
+%     \centering
+%     \includegraphics[width=\textwidth]{21facf.pdf}
+%     \caption{ACF of the noisy function}
+% \end{subfigure}
+
+% \vspace{0.5em}
+
+% % --- Row 2 ---
+% \begin{subfigure}[t]{0.32\textwidth}
+%     \centering
+%     \includegraphics[width=\textwidth]{21rpsd.pdf}
+%     \caption{PSD of the residual}
+% \end{subfigure}
+% \hfill
+% \begin{subfigure}[t]{0.32\textwidth}
+%     \centering
+%     \includegraphics[width=\textwidth]{21cutoff.pdf}
+%     \caption{Frequency power cutoff percentage }
+% \end{subfigure}
+% \hfill
+% \begin{subfigure}[t]{0.32\textwidth}
+%     \centering
+%     \includegraphics[width=\textwidth]{21racf.pdf}
+%     \caption{ACF of the residual}
+% \end{subfigure}
+
+% \caption{Results of the statistical analysis for the original evaporator temperature signal}
+% \label{fig:evaptemp0.pdf}
+% \end{figure}
+
+% \begin{table}[H]
+% \centering
+% \caption{Statistical metrics for the original evaporator temperature signal}
+% \input{21tab}
+% \label{tab:evaptemp0}
+% \end{table}
+
+% \begin{figure}[H]
+% \centering
+
+% % --- Row 1 ---
+% \begin{subfigure}[t]{0.32\textwidth}
+%     \centering
+%     \includegraphics[width=\textwidth]{22sr.pdf}
+%     \caption{Smoothed versus noisy functions}
+% \end{subfigure}
+% \hfill
+% \begin{subfigure}[t]{0.32\textwidth}
+%     \centering
+%     \includegraphics[width=\textwidth]{22fpsd.pdf}
+%     \caption{PSD of smoothed versus noisy functions}
+% \end{subfigure}
+% \hfill
+% \begin{subfigure}[t]{0.32\textwidth}
+%     \centering
+%     \includegraphics[width=\textwidth]{22facf.pdf}
+%     \caption{ACF of the noisy function}
+% \end{subfigure}
+
+% \vspace{0.5em}
+
+% % --- Row 2 ---
+% \begin{subfigure}[t]{0.32\textwidth}
+%     \centering
+%     \includegraphics[width=\textwidth]{22rpsd.pdf}
+%     \caption{PSD of the residual}
+% \end{subfigure}
+% \hfill
+% \begin{subfigure}[t]{0.32\textwidth}
+%     \centering
+%     \includegraphics[width=\textwidth]{22cutoff.pdf}
+%     \caption{Frequency power cutoff percentage }
+% \end{subfigure}
+% \hfill
+% \begin{subfigure}[t]{0.32\textwidth}
+%     \centering
+%     \includegraphics[width=\textwidth]{22racf.pdf}
+%     \caption{ACF of the residual}
+% \end{subfigure}
+
+% \caption{Results of the statistical analysis for the first summand of the evaporator temperature signal}
+% \label{fig:evaptemp1.pdf}
+% \end{figure}
+% \begin{table}[H]
+% \centering
+% \caption{Statistical metrics for the first summand of the evaporator temperature signal}
+% \input{22tab}
+% \label{tab:evaptemp1}
+% \end{table}
+
+% \begin{figure}[H]
+% \centering
+
+% % --- Row 1 ---
+% \begin{subfigure}[t]{0.32\textwidth}
+%     \centering
+%     \includegraphics[width=\textwidth]{23sr.pdf}
+%     \caption{Smoothed versus noisy functions}
+% \end{subfigure}
+% \hfill
+% \begin{subfigure}[t]{0.32\textwidth}
+%     \centering
+%     \includegraphics[width=\textwidth]{23fpsd.pdf}
+%     \caption{PSD of smoothed versus noisy functions}
+% \end{subfigure}
+% \hfill
+% \begin{subfigure}[t]{0.32\textwidth}
+%     \centering
+%     \includegraphics[width=\textwidth]{23facf.pdf}
+%     \caption{ACF of the noisy function}
+% \end{subfigure}
+
+% \vspace{0.5em}
+
+% % --- Row 2 ---
+% \begin{subfigure}[t]{0.32\textwidth}
+%     \centering
+%     \includegraphics[width=\textwidth]{23rpsd.pdf}
+%     \caption{PSD of the residual}
+% \end{subfigure}
+% \hfill
+% \begin{subfigure}[t]{0.32\textwidth}
+%     \centering
+%     \includegraphics[width=\textwidth]{23cutoff.pdf}
+%     \caption{Frequency power cutoff percentage }
+% \end{subfigure}
+% \hfill
+% \begin{subfigure}[t]{0.32\textwidth}
+%     \centering
+%     \includegraphics[width=\textwidth]{23racf.pdf}
+%     \caption{ACF of the residual}
+% \end{subfigure}
+
+% \caption{Results of the statistical analysis for the second summand of the evaporator temperature signal}
+% \label{fig:evaptemp2.pdf}
+% \end{figure}
+
+% \begin{table}[H]
+% \centering
+% \caption{Statistical metrics for the second summand of the evaporator temperature signal}
+% \input{23tab}
+% \label{tab:evaptemp2}
+% \end{table}
+
+% \begin{figure}[H]
+% \centering
+
+% % --- Row 1 ---
+% \begin{subfigure}[t]{0.32\textwidth}
+%     \centering
+%     \includegraphics[width=\textwidth]{24o.pdf}
+%     \caption{Raw signal}
+% \end{subfigure}
+% \hfill
+% \begin{subfigure}[t]{0.32\textwidth}
+%     \centering
+%     \includegraphics[width=\textwidth]{241.pdf}
+%     \caption{Linear spline}
+% \end{subfigure}
+% \hfill
+% \begin{subfigure}[t]{0.32\textwidth}
+%     \centering
+%     \includegraphics[width=\textwidth]{243.pdf}
+%     \caption{Cubic spline}
+% \end{subfigure}
+
+% \vspace{0.5em}
+
+
+% \begin{subfigure}[t]{0.32\textwidth}
+%     \centering
+%     \includegraphics[width=\textwidth]{245.pdf}
+%     \caption{Quintic spline}
+% \end{subfigure}
+
+% \vspace{0.5em}
+
+
+% \begin{subfigure}[t]{0.32\textwidth}
+%     \centering
+%     \includegraphics[width=\textwidth]{247.pdf}
+%     \caption{Septic spline}
+% \end{subfigure}
+
+% \caption{Results of the original vs computed evaporator temperature signals}
+% \label{fig:evaptemp3.pdf}
+% \end{figure}
+
+% \begin{table}[H]
+% \centering
+% \caption{RMSE for the original vs computed evaporator temperature signals}
+% \input{24tab}
+% \label{tab:evaptemp3}
+% \end{table}
+
+
+
+% \subsubsection{Water flow to the chillers}
+% Another interesting dataset to examine shows the volumetric flow of chilled water to the chillers in Figure \ref{fig:chilledflow.pdf}. The main features of the signal are sharp dips and spikes that are not noise, but may be characterized as such. Fortunately, our method does not recognize it as part of the underlying dynamic, and the only noticeable impact is a minor autocorrelation seen in Figure \ref{fig:chilledflow.pdf}f. As expected, linear spline performed the worst of all, having eliminated a minimal amount of high frequencies. The cubic spline showed better results, removing more high frequencies but also failing to conserve some lower ones, unlike the splines of $5^{th}$ and $7^{th}$ degrees, and the difference between them is negligible enough that we can confidently choose the former for computational efficiency. 
+
+% \begin{figure}[H]
+% \centering
+
+% % --- Row 1 ---
+% \begin{subfigure}[t]{0.32\textwidth}
+%     \centering
+%     \includegraphics[width=\textwidth]{3sr.pdf}
+%     \caption{Smoothed versus noisy functions}
+% \end{subfigure}
+% \hfill
+% \begin{subfigure}[t]{0.32\textwidth}
+%     \centering
+%     \includegraphics[width=\textwidth]{3fpsd.pdf}
+%     \caption{PSD of smoothed versus noisy functions}
+% \end{subfigure}
+% \hfill
+% \begin{subfigure}[t]{0.32\textwidth}
+%     \centering
+%     \includegraphics[width=\textwidth]{3facf.pdf}
+%     \caption{ACF of the noisy function}
+% \end{subfigure}
+
+% \vspace{0.5em}
+
+% % --- Row 2 ---
+% \begin{subfigure}[t]{0.32\textwidth}
+%     \centering
+%     \includegraphics[width=\textwidth]{3rpsd.pdf}
+%     \caption{PSD of the residual}
+% \end{subfigure}
+% \hfill
+% \begin{subfigure}[t]{0.32\textwidth}
+%     \centering
+%     \includegraphics[width=\textwidth]{3cutoff.pdf}
+%     \caption{Frequency power cutoff percentage }
+% \end{subfigure}
+% \hfill
+% \begin{subfigure}[t]{0.32\textwidth}
+%     \centering
+%     \includegraphics[width=\textwidth]{3racf.pdf}
+%     \caption{ACF of the residual}
+% \end{subfigure}
+
+% \caption{Results of the statistical analysis for for the water flow signal}
+% \label{fig:chilledflow.pdf}
+% \end{figure}
+% \begin{table}[H]
+% \centering
+% \caption{Statistical metrics for the water flow signal}
+% \input{3tab}
+% \label{tab:chillwat}
+% \end{table}
+% \subsubsection{Outside temperature}
+% Apart from being able to choose the degree of spline, we can also decide what data and how much of it we want to apply the method to at a time. For example, one of our datasets contains temperature data measured for multiple days, thus has a periodic structure with multiple complete cycles that we can divide to smooth separately. As we can observe in Table \ref{tab:outtemp}, the amount of smoothing slightly decreases if the dataset is analyzed one day at a time instead of the whole period. It does not, however, solve the problem of non-critical but noticeable autocorrelation in both Figures \ref{c} and \ref{fig:tempsep} -- there is thus no benefit in creating additional computational complexity and dividing this signal for a better result. All spline degrees, bar linear, produce comparable results according to PSD plots in Figures, which motivates us to opt for the computationally efficient cubic spline.
+% \begin{figure}[H]
+% \centering
+
+% % --- Row 1 ---
+% \begin{subfigure}[t]{0.32\textwidth}
+%     \centering
+%     \includegraphics[width=\textwidth]{41sr.pdf}
+%     \caption{Smoothed versus noisy functions}
+% \end{subfigure}
+% \hfill
+% \begin{subfigure}[t]{0.32\textwidth}
+%     \centering
+%     \includegraphics[width=\textwidth]{41fpsd.pdf}
+%     \caption{PSD of smoothed versus noisy functions}
+% \end{subfigure}
+% \hfill
+% \begin{subfigure}[t]{0.32\textwidth}
+%     \centering
+%     \includegraphics[width=\textwidth]{41facf.pdf}
+%     \caption{ACF of the noisy function}
+% \end{subfigure}
+
+% \vspace{0.5em}
+
+% % --- Row 2 ---
+% \begin{subfigure}[t]{0.32\textwidth}
+%     \centering
+%     \includegraphics[width=\textwidth]{41rpsd.pdf}
+%     \caption{PSD of the residual}
+% \end{subfigure}
+% \hfill
+% \begin{subfigure}[t]{0.32\textwidth}
+%     \centering
+%     \includegraphics[width=\textwidth]{41cutoff.pdf}
+%     \caption{Frequency power cutoff percentage }
+% \end{subfigure}
+% \hfill
+% \begin{subfigure}[t]{0.32\textwidth}
+%     \centering
+%     \includegraphics[width=\textwidth]{41racf.pdf}
+%     \caption{ACF of the residual}
+% \end{subfigure}
+
+% \caption{Results of the statistical analysis for the fully smoothed outside humidity signal}
+% \label{fig:temptogetha}
+% \end{figure}
+
+
+
+% \begin{figure}[H]
+% \centering
+
+% % --- Row 1 ---
+% \begin{subfigure}[t]{0.32\textwidth}
+%     \centering
+%     \includegraphics[width=\textwidth]{42sr.pdf}
+%     \caption{Smoothed versus noisy functions}
+% \end{subfigure}
+% \hfill
+% \begin{subfigure}[t]{0.32\textwidth}
+%     \centering
+%     \includegraphics[width=\textwidth]{42fpsd.pdf}
+%     \caption{PSD of smoothed versus noisy functions}
+% \end{subfigure}
+% \hfill
+% \begin{subfigure}[t]{0.32\textwidth}
+%     \centering
+%     \includegraphics[width=\textwidth]{42facf.pdf}
+%     \caption{ACF of the noisy function}
+% \end{subfigure}
+
+% \vspace{0.5em}
+
+% % --- Row 2 ---
+% \begin{subfigure}[t]{0.32\textwidth}
+%     \centering
+%     \includegraphics[width=\textwidth]{42rpsd.pdf}
+%     \caption{PSD of the residual}
+% \end{subfigure}
+% \hfill
+% \begin{subfigure}[t]{0.32\textwidth}
+%     \centering
+%     \includegraphics[width=\textwidth]{42cutoff.pdf}
+%     \caption{Frequency power cutoff percentage }
+% \end{subfigure}
+% \hfill
+% \begin{subfigure}[t]{0.32\textwidth}
+%     \centering
+%     \includegraphics[width=\textwidth]{42racf.pdf}
+%     \caption{ACF of the residual}
+% \end{subfigure}
+
+% \caption{Results of the statistical analysis for the separately smoothed outside humidity signal}
+% \label{fig:tempsep}
+% \end{figure}
+% \begin{table}[H]
+% \centering
+% \caption{Statistical metrics for the outside humidity signal}
+% \input{4tab}
+% \label{tab:outtemp}
+% \end{table}
+
+% \subsubsection{Outside humidity}
+% So far we have demonstrated signals that produced nice, comprehensible smoothing; however, it is also important to show examples of the opposite -- sometimes our method produces almost no results, or a result uninterpretable by our choice of statistical tests. An example of such is a dataset containing outside humidity measurements -- as we can see in Figure \ref{fig:outsidetemp}a, no visible smoothing occurred. It is perhaps not as unexpected, as the outside humidity is not measured in the building as seen in Figure \ref{fig:chiller} and is therefore not influenced by nearby equipment, thus likely containing much less noise than other measurements. What is unexpected, however, is that despite the absence of visible changes in Figure \ref{fig:outsidehum}a, the cutoff plot in Figure \ref{fig:outsidehum}e displays a completely different dynamic -- more precisely, it suggests that the smoothing additionally polluted the signal with a large number of high frequencies. Moreover, the ACF plot in Figure \ref{fig:outsidehum}f seems to imply that there is autocorrelation present in the residual. If we attempted to analyze this result similarly to the previous ones, we would most likely interpret this as the method being completely unusable for this dataset. However, it is evident that this interpretation is false -- although statistical metrics are essential for thorough analysis, sometimes they may lead to overthinking and confusion, and critical reasoning should always be at the forefront. In this case we can see that there is virtually no difference between the splines, bar possibly linear, thus the cubic spline is the optimal choice.
+% \begin{figure}[H]
+% \centering
+
+% % --- Row 1 ---
+% \begin{subfigure}[t]{0.32\textwidth}
+%     \centering
+%     \includegraphics[width=\textwidth]{5sr.pdf}
+%     \caption{Smoothed versus noisy functions}
+% \end{subfigure}
+% \hfill
+% \begin{subfigure}[t]{0.32\textwidth}
+%     \centering
+%     \includegraphics[width=\textwidth]{5fpsd.pdf}
+%     \caption{PSD of smoothed versus noisy functions}
+% \end{subfigure}
+% \hfill
+% \begin{subfigure}[t]{0.32\textwidth}
+%     \centering
+%     \includegraphics[width=\textwidth]{5facf.pdf}
+%     \caption{ACF of the noisy function}
+% \end{subfigure}
+
+% \vspace{0.5em}
+
+% % --- Row 2 ---
+% \begin{subfigure}[t]{0.32\textwidth}
+%     \centering
+%     \includegraphics[width=\textwidth]{5rpsd.pdf}
+%     \caption{PSD of the residual}
+% \end{subfigure}
+% \hfill
+% \begin{subfigure}[t]{0.32\textwidth}
+%     \centering
+%     \includegraphics[width=\textwidth]{5cutoff.pdf}
+%     \caption{Frequency power cutoff percentage }
+% \end{subfigure}
+% \hfill
+% \begin{subfigure}[t]{0.32\textwidth}
+%     \centering
+%     \includegraphics[width=\textwidth]{5racf.pdf}
+%     \caption{ACF of the residual}
+% \end{subfigure}
+
+% \caption{Results of the statistical analysis for the outside signal}
+% \label{fig:outsidehum}
+% \end{figure}
+
+% \begin{table}[H]
+% \centering
+% \caption{Statistical metrics for the outside humidity signal}
+% \input{5tab}
+% \label{tab:outhum}
+% \end{table}
+\chapter{Conclusions}
+This thesis introduced the method of smoothing noisy data using smoothing splines and specified possible ways of finding its trade-off parameter, depending on the available knowledge of variance. It focused in particular on Generalized Cross-Validation (GCV) -- an algorithm widely used due to its strong theoretical base, computational convenience and efficiency, etc. Chapter 2 described the construction of GCV for the second-order derivative and provided a more detailed derivation of the respective spline than given by Reinsch, as well as proposed formulas for the first-order spline. The method was experimentally found to provide a very good approximation to the "true" function masked by noise. However, such consistency could only be reliably confirmed if the data were polluted by a white noise process. Tests on other noise types showed that the algorithm occasionally resulted in erroneous smoothing that was difficult to detect. In addition, although we have not encountered the sporadic severe undersmoothing issue mentioned by Wahba, it cannot be ruled out. To minimize the risk of faulty smoothing, a set of statistical tests was established in Chapter 3, which was shown to provide comprehensive and comprehensible information about the smoothing result. Another problem encountered is that the construction of the GCV in a way given in \cite{Craven1978} became rather tedious to derive for splines of degrees higher than 3. For that reason, an existing algorithm was used for quintic and septic splines, which allowed for an adjustable spline order. Chapter 3 also provided a general guideline for using the statistical metrics mentioned before to select such optimal order or at least eliminate the ill-suited ones. Chapter 4 demonstrated the results of the algorithm on the real-life data sets provided by Carrier and further elaborated on the analysis of the smoothed function.
+
+Although the method of smoothing splines fits the aim of the thesis well, as we are mostly working on medium-sized datasets with reasonably well-behaved noise, it is not a universal solution. Apart from the mentioned inconsistency for non-white noise, it also becomes notably slow on larger volumes of data, losing in efficiency to, for example, P-splines method outlined in the introduction. Apart from these limitations, smoothing splines delivered great results for the tested data sets and were highly convenient to use, due to their easy algorithm and completely automatic computation.
+
+\bibliographystyle{IEEEtran}
+\bibliography{references}
+\end{document}
