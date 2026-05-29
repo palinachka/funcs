@@ -1,0 +1,19 @@
+"latex-workshop.latex.recipes": [
+  {
+    "name": "latexmk (auto bibtex)",
+    "tools": ["latexmk"]
+  }
+],
+"latex-workshop.latex.tools": [
+  {
+    "name": "latexmk",
+    "command": "latexmk",
+    "args": [
+      "-pdf",
+      "-interaction=nonstopmode",
+      "-synctex=1",
+      "%DOC%"
+    ]
+  }
+],
+"latex-workshop.latex.recipe.default": "latexmk (auto bibtex)"
